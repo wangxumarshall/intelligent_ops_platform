@@ -19,5 +19,5 @@ EXPOSE 8000
 # -w 4: 启动 4 个工作进程 (根据您的服务器 CPU 核心数调整)
 # -k uvicorn.workers.UvicornWorker: 使用 Uvicorn 作为工作模式
 # -b 0.0.0.0:8000: 绑定到容器的所有网络接口的 8000 端口
-# main:app: 您的 FastAPI 应用实例 (main.py 文件中的 app 对象)
-CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "main:app"]
+# app.main:app: 您的 FastAPI 应用实例 (backend/app/main.py 文件中的 app 对象)
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "app.main:app"]

@@ -1,11 +1,16 @@
+// frontend/tailwind.config.js
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./index.html",
-    "./src/**/*.{vue,js,ts,jsx,tsx}", // Adjust if using Vue or other frameworks
+    "./public/index.html", // Scan the main HTML shell in public
+    "./src/**/*.{vue,js,ts,jsx,tsx}" // Scan all Vue components and JS/TS files in src
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'], // Set Inter as default sans-serif
+      },
+    },
   },
   plugins: [],
 }

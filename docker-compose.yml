@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  # 后端服务定义
+  backend:
+    build: ./backend  # 指定 Dockerfile 的上下文路径
+    restart: always   # 如果容器挂了，自动重启
+    container_name: aiops_backend # 自定义容器名
+    expose:
+      - "8000" # 只在 Docker 内部网络中暴露端口，不映射到宿主机
+    networks:
+      - aiops_network # 加入我们定义的网络
+
+  # 前端服务定义
+  frontend:
+    build: ./frontend
+    restart: always
+    container_name: aiops_frontend
+    ports:
+      - "80:80" # 将宿主机的 80 端口映射到容器的 80 端口，这样我们就能通过 IP 访问
+    depends_on:
+      - backend # 确保后端服务先于前端服务启动
+    networks:
+      - aiops_network
+
+# 定义 Docker 网络
+networks:
+  aiops_network:
+    driver: bridge

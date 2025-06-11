@@ -1,9 +1,6 @@
 # backend/app/main.py
 from fastapi import FastAPI
 # from fastapi.responses import FileResponse # FileResponse will not be used by backend directly
-from pathlib import Path
-from fastapi.websockets import WebSocket # Will be moved to an endpoint file
-import json # For WebSocket, to be moved
 
 # Import API router and settings
 from .api.v1.api import api_router
@@ -45,49 +42,21 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 async def app_health_check():
     return {"status": "application healthy"}
 
-# Gunicorn runs this app:app instance, so no if __name__ == "__main__": block.
-# Example: CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "app.main:app"]
-# Note the module path for Gunicorn will be app.main:app assuming WORKDIR in Dockerfile is /app (which is backend/app)
-# Or if WORKDIR is / (project root), then backend.app.main:app
-# The current backend/Dockerfile has WORKDIR /app, which means it refers to backend/
-# So the command should be `gunicorn ... app.main:app` if main.py is in backend/app/
-# Or `main:app` if main.py is in backend/ (the WORKDIR).
-# The backend Dockerfile is `WORKDIR /app` and then `COPY . .`, meaning /app is the backend directory.
-# So, the command `CMD ["gunicorn", ..., "main:app"]` in backend/Dockerfile implies `backend/main.py`.
-# This needs to be changed to `app.main:app` in backend/Dockerfile. I'll handle this in a later step if needed.
-# For now, this file is backend/app/main.py.
-# The existing backend/Dockerfile has `CMD ["gunicorn", ..., "main:app"]`.
-# This will need to be updated to `CMD ["gunicorn", ..., "app.main:app"]` because the main.py is now in backend/app/
-# I will make a note to update the Dockerfile later.
-
 # For now, let's add the health check that was in the instructions:
-# This is a bit redundant with the /health above, but following instructions.
-# The instruction one was /api/v1/health, this one is /api/v1/health
-# The one in instruction was to be created in `backend/app/main.py`
-# The file `backend/app/api/v1/endpoints/health.py` will have `/ping`
-# The `app.include_router(api_router, prefix=settings.API_V1_STR)` will make it available.
-# So, I will remove the @app.get("/api/v1/health") from here if it's meant to be from the router.
+# This is a bit redundant with the /health above, but an explicit requirement.
+# The file `backend/app/api/v1/endpoints/health.py` will have `/ping`.
+# The `app.include_router(api_router, prefix=settings.API_V1_STR)` will make it available under `/api/v1/health/ping`.
 
-# The instructions for Step 5's app/main.py had:
+# The instructions for Step 5 of the backend refactor subtask for app/main.py had:
 # @app.get("/api/v1/health")
 # async def health_check():
 # return {"status": "healthy"}
-# This is fine as a direct endpoint on app, or it can come from a router.
-# Let's assume it's a direct one for now, distinct from the router's /ping
+# This specific endpoint is still present.
 @app.get(settings.API_V1_STR + "/health", tags=["Direct Health Check"])
 async def direct_health_check():
     return {"status": "healthy from app.main direct"}
 
-# The websocket from old main.py needs to be moved.
-# I will create a new endpoint file for it as part of this restructuring.
-# backend/app/api/v1/endpoints/chat.py could be a place.
-# For now, the definition is lost from old main.py unless I put it here.
-# I will put the websocket code into a new file `backend/app/api/v1/endpoints/websocket_echo.py`
-
-# The lines for api_router and settings are not commented out as per step 10 preview.
-# title and openapi_url are also set.
-# The websocket code from old main.py is not here, it will be moved to a dedicated endpoint file.
-# The FileResponse for index.html is correctly removed.
-# The if __name__ block is correctly removed.
-# The placeholder /api/v1/health endpoint is added.
-# The main structure looks fine according to the plan.
+# Obsolete WebSocket code and related comments have been removed.
+# FileResponse import is not needed.
+# Path, WebSocket, json imports were removed.
+# Gunicorn command comment block was removed.

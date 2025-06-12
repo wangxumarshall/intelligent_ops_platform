@@ -11,13 +11,32 @@
         th { background-color: #f0f0f0; }
         a { text-decoration: none; color: #007bff; }
         a:hover { text-decoration: underline; }
-        .upload-form { margin-top: 20px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9; }
-        .upload-form input[type="file"] { margin-bottom: 10px; }
+        #uploadTriggerBtn {
+            padding: 8px 12px;
+            background-color: #007bff; /* Blue background */
+            color: white;             /* White text */
+            border: none;
+            border-radius: 4px;       /* Rounded corners */
+            cursor: pointer;          /* Pointer cursor on hover */
+            font-size: 0.9em;
+        }
+        #uploadTriggerBtn:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
     </style>
 </head>
 <body>
-    <h1>File Browser</h1>
-    <p>Current Path: /{{ current_path_display }}</p>
+    <h1 style="text-align: center;">File Browser</h1>
+
+    <div class="path-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <p style="margin: 0;">Current Path: /{{ current_path_display }}</p>
+        <form method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm" style="margin: 0;">
+            <input type="hidden" name="current_subdir" value="{{ current_path_display }}">
+            <input type="file" name="file" id="fileInput" required style="display: none;">
+            <!-- This button will trigger the hidden file input via JavaScript -->
+            <button type="button" id="uploadTriggerBtn">Upload File</button>
+        </form>
+    </div>
 
     <table>
         <thead>
@@ -62,13 +81,28 @@
         </tbody>
     </table>
 
-    <div class="upload-form">
-        <h2>Upload File to Current Directory</h2>
-        <form method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
-            <input type="hidden" name="current_subdir" value="{{ current_path_display }}">
-            <input type="file" name="file" required>
-            <button type="submit">Upload</button>
-        </form>
-    </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadTriggerBtn = document.getElementById('uploadTriggerBtn');
+        const fileInput = document.getElementById('fileInput');
+        const uploadForm = document.getElementById('uploadForm');
+
+        if (uploadTriggerBtn && fileInput && uploadForm) {
+            uploadTriggerBtn.addEventListener('click', function() {
+                fileInput.click(); // Trigger click on the hidden file input
+            });
+
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) {
+                    // Optional: Add a visual cue or confirmation here if desired
+                    console.log('File selected:', fileInput.files[0].name);
+                    uploadForm.submit(); // Automatically submit the form
+                }
+            });
+        } else {
+            console.error('Required elements for upload not found.');
+        }
+    });
+</script>
 </body>
 </html>

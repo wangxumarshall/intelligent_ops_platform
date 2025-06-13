@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, abort
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, abort, flash
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -131,6 +131,62 @@ def internal_error(error):
     # It's good practice to log the error here
     return render_template('500.html', error=error), 500
 
+@app.route('/create_folder', methods=['POST'])
+def create_folder():
+    current_subdir = request.form.get('current_subdir', '')
+    new_folder_name_raw = request.form.get('new_folder_name', '').strip()
+
+    # Validate folder name
+    if not new_folder_name_raw:
+        # flash("Folder name cannot be empty.", "error") # Optional: for future flash messages
+        print("Error: Folder name cannot be empty.") # Log error
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    # Sanitize folder name
+    new_folder_name = secure_filename(new_folder_name_raw)
+    if new_folder_name != new_folder_name_raw or '/' in new_folder_name_raw or '\\' in new_folder_name_raw:
+        # Check if secure_filename changed it significantly or if it contained invalid chars
+        # flash("Invalid characters in folder name.", "error")
+        print(f"Error: Invalid characters in folder name: {new_folder_name_raw}")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    if not new_folder_name: # Handles cases like ".." or "." becoming empty after secure_filename
+            # flash("Invalid folder name.", "error")
+        print(f"Error: Invalid folder name after sanitization: {new_folder_name_raw}")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+
+    target_parent_dir = os.path.join(app.config['BASE_SERVED_DIR'], current_subdir)
+    target_parent_dir = os.path.abspath(target_parent_dir)
+
+    # Security check: Ensure target parent is within BASE_SERVED_DIR
+    if not target_parent_dir.startswith(os.path.abspath(app.config['BASE_SERVED_DIR'])):
+        # flash("Invalid path.", "error")
+        print("Error: Invalid path for folder creation (parent directory out of bounds).")
+        return redirect(url_for('browse_files', subpath='')) # Redirect to root
+
+    new_folder_path = os.path.join(target_parent_dir, new_folder_name)
+    new_folder_path = os.path.abspath(new_folder_path) # Normalize
+
+    # Additional security check: ensure the new folder itself doesn't escape BASE_SERVED_DIR (e.g. if new_folder_name was '..')
+    # This is somewhat redundant due to secure_filename and the previous check, but good for defense in depth.
+    if not new_folder_path.startswith(os.path.abspath(app.config['BASE_SERVED_DIR'])):
+        # flash("Invalid folder name leading to path escape.", "error")
+        print("Error: Invalid folder name leading to path escape.")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    try:
+        os.mkdir(new_folder_path)
+        # flash(f"Folder '{new_folder_name}' created successfully.", "success")
+        print(f"Folder '{new_folder_path}' created successfully.")
+    except FileExistsError:
+        # flash(f"Folder '{new_folder_name}' already exists.", "warning")
+        print(f"Warning: Folder '{new_folder_path}' already exists.")
+    except OSError as e:
+        # flash(f"Error creating folder: {e.strerror}", "error")
+        print(f"Error creating folder '{new_folder_path}': {e}")
+
+    return redirect(url_for('browse_files', subpath=current_subdir))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)

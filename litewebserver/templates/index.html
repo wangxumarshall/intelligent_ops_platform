@@ -11,6 +11,34 @@
         th { background-color: #f0f0f0; }
         a { text-decoration: none; color: #007bff; }
         a:hover { text-decoration: underline; }
+
+        .controls-group input[type="text"],
+        .controls-group input[type="search"] {
+            padding: 7px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9em;
+            box-sizing: border-box; /* Ensures padding doesn't increase overall size unexpectedly */
+        }
+
+        .controls-group button { /* General style for buttons in this group */
+            padding: 8px 12px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        /* Specific button color for Create Folder */
+        .controls-group form[action*="create_folder"] button[type="submit"] {
+            background-color: #28a745; /* Green */
+        }
+        .controls-group form[action*="create_folder"] button[type="submit"]:hover {
+            background-color: #1e7e34; /* Darker green */
+        }
+
+        /* The #uploadTriggerBtn already has its blue styles defined, which will override the general .controls-group button color if its CSS specificity is higher or equal, or if it comes later for same specificity. Given it's an ID, it will override. */
         #uploadTriggerBtn {
             padding: 8px 12px;
             background-color: #007bff; /* Blue background */
@@ -30,12 +58,25 @@
 
     <div class="path-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <p style="margin: 0;">Current Path: /{{ current_path_display }}</p>
-        <form method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm" style="margin: 0;">
-            <input type="hidden" name="current_subdir" value="{{ current_path_display }}">
-            <input type="file" name="file" id="fileInput" required style="display: none;">
-            <!-- This button will trigger the hidden file input via JavaScript -->
-            <button type="button" id="uploadTriggerBtn">Upload File</button>
-        </form>
+
+        <div class="controls-group" style="display: flex; align-items: center; gap: 10px;">
+            <!-- Create Folder Form -->
+            <form method="post" action="{{ url_for('create_folder') }}" style="margin: 0; display: flex; align-items: center; gap: 5px;">
+                <input type="hidden" name="current_subdir" value="{{ current_path_display }}">
+                <input type="text" name="new_folder_name" placeholder="New folder name..." required size="15">
+                <button type="submit">Create Folder</button>
+            </form>
+
+            <!-- Search Input Field -->
+            <input type="search" id="searchInput" placeholder="Search current directory...">
+
+            <!-- Existing Upload Form (simplified button) -->
+            <form method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm" style="margin: 0;">
+                <input type="hidden" name="current_subdir" value="{{ current_path_display }}">
+                <input type="file" name="file" id="fileInput" required style="display: none;">
+                <button type="button" id="uploadTriggerBtn">Upload File</button> <!-- Existing styled button -->
+            </form>
+        </div>
     </div>
 
     <table>
@@ -101,6 +142,41 @@
             });
         } else {
             console.error('Required elements for upload not found.');
+        }
+
+        // New Search Filter Logic
+        const searchInput = document.getElementById('searchInput');
+        const tableBody = document.querySelector('table tbody'); // Assumes one table on the page
+
+        if (searchInput && tableBody) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const rows = tableBody.getElementsByTagName('tr');
+
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    const firstCell = row.getElementsByTagName('td')[0];
+
+                    if (firstCell) {
+                        const cellText = firstCell.textContent || firstCell.innerText; // Get text content
+                        const cellTextLower = cellText.toLowerCase();
+
+                        // Always show parent directory link if it exists
+                        if (cellText.includes('.. (Parent Directory)')) {
+                            row.style.display = ''; // Or 'table-row'
+                            continue; // Skip further processing for this row
+                        }
+
+                        if (cellTextLower.includes(searchTerm)) {
+                            row.style.display = ''; // Or 'table-row'
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    }
+                }
+            });
+        } else {
+            console.error('Search input or table body not found for search functionality.');
         }
     });
 </script>

@@ -8,6 +8,7 @@ app = Flask(__name__)
 # --- Configuration ---
 BASE_SERVED_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'served_data'))
 app.config['UPLOAD_FOLDER'] = BASE_SERVED_DIR  # Files will be uploaded into subdirs of BASE_SERVED_DIR
+app.config['BASE_SERVED_DIR'] = BASE_SERVED_DIR # <--- ADD THIS LINE
 app.config['SECRET_KEY'] = 'supersecretkey' # For flash messages, if we add them later
 
 # Ensure BASE_SERVED_DIR exists
@@ -37,7 +38,7 @@ def get_path_details(base_path, subpath=""):
 @app.route('/browse/')
 @app.route('/browse/<path:subpath>')
 def browse_files(subpath=""):
-    current_dir_abs = get_path_details(BASE_SERVED_DIR, subpath)
+    current_dir_abs = get_path_details(app.config['BASE_SERVED_DIR'], subpath)
 
     items = []
     try:
@@ -64,7 +65,7 @@ def browse_files(subpath=""):
     parent_dir_display = None
     current_path_display = subpath.strip('/')
 
-    if current_dir_abs != BASE_SERVED_DIR:
+    if current_dir_abs != app.config['BASE_SERVED_DIR']:
         parent_subpath = os.path.dirname(subpath.strip('/'))
         parent_dir_display = parent_subpath if parent_subpath else "" # Link to root if parent is root
 
@@ -76,17 +77,17 @@ def browse_files(subpath=""):
 @app.route('/download/<path:filepath>')
 def download_file(filepath):
     # filepath is relative to BASE_SERVED_DIR
-    abs_filepath = os.path.abspath(os.path.join(BASE_SERVED_DIR, filepath.strip('/')))
+    abs_filepath = os.path.abspath(os.path.join(app.config['BASE_SERVED_DIR'], filepath.strip('/')))
 
     # Security Check: Ensure the file is within BASE_SERVED_DIR
-    if not abs_filepath.startswith(BASE_SERVED_DIR) or not os.path.isfile(abs_filepath):
+    if not abs_filepath.startswith(app.config['BASE_SERVED_DIR']) or not os.path.isfile(abs_filepath):
         abort(403) # Or 404 if preferred for non-existent but valid-looking paths
 
     directory = os.path.dirname(filepath.strip('/'))
     filename = os.path.basename(filepath.strip('/'))
 
     return send_from_directory(
-        directory=os.path.join(BASE_SERVED_DIR, directory),
+        directory=os.path.join(app.config['BASE_SERVED_DIR'], directory),
         path=filename,  # send_from_directory expects 'path' to be the filename
         as_attachment=True
     )
@@ -94,7 +95,7 @@ def download_file(filepath):
 @app.route('/upload', methods=['POST'])
 def upload_file():
     target_subdir = request.form.get('current_subdir', '').strip('/')
-    upload_to_dir_abs = get_path_details(BASE_SERVED_DIR, target_subdir) # Validates and gets abs path
+    upload_to_dir_abs = get_path_details(app.config['BASE_SERVED_DIR'], target_subdir) # Validates and gets abs path
 
     if 'file' not in request.files:
         # Handle error - redirect or flash message

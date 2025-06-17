@@ -76,7 +76,7 @@ def browse_files(subpath=""):
         parent_subpath = os.path.dirname(subpath.strip('/'))
         parent_dir_display = parent_subpath if parent_subpath else "" # Link to root if parent is root
 
-    return render_template('index.html',
+    return render_template('data_brower.html',
                            items=items,
                            current_path_display=current_path_display,
                            parent_dir_display=parent_dir_display)

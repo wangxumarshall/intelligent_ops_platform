@@ -50,8 +50,7 @@
                         n.wrapInner(a("<div>").addClass("str_move"))
                     }
                     var y = a(".str_move", n).addClass("str_origin"),
-                        z = y.clone().removeClass("str_origin").addClass("str_mo
-ve_clone"),
+                        z = y.clone().removeClass("str_origin").addClass("str_move_clone"),
                         B = 0;
                     if (!d.hoverstop) {
                         n.addClass("noStop")
@@ -102,8 +101,7 @@ ve_clone"),
                                         G = (F / n.data("scrollamount")) * 1000;
                                     if (parseFloat(y.css("left")) != 0) {
                                         F = (F + n.width());
-                                        G = (F - (n.width() - parseFloat(y.css("
-left")))) / n.data("scrollamount") * 1000
+                                        G = (F - (n.width() - parseFloat(y.css("left")))) / n.data("scrollamount") * 1000
                                     }
                                     return G
                                 },
@@ -162,33 +160,28 @@ left")))) / n.data("scrollamount") * 1000
                                                 F = -1
                                             }
                                             J = I;
-                                            G = s + (K.clientX - n.offset().left
-);
+                                            G = s + (K.clientX - n.offset().left);
                                             if (!d.circular) {
                                                 if (G < -y.width() && F < 0) {
                                                     G = n.width();
                                                     A = y.position().left;
-                                                    s = A - (K.clientX - n.offse
-t().left)
+                                                    s = A - (K.clientX - n.offset().left)
                                                 }
                                                 if (G > n.width() && F > 0) {
                                                     G = -y.width();
                                                     A = y.position().left;
-                                                    s = A - (K.clientX - n.offse
-t().left)
+                                                    s = A - (K.clientX - n.offset().left)
                                                 }
                                             } else {
                                                 if (G < -y.width() && F < 0) {
                                                     G = 0;
                                                     A = y.position().left;
-                                                    s = A - (K.clientX - n.offse
-t().left)
+                                                    s = A - (K.clientX - n.offset().left)
                                                 }
                                                 if (G > 0 && F > 0) {
                                                     G = -y.width();
                                                     A = y.position().left;
-                                                    s = A - (K.clientX - n.offse
-t().left)
+                                                    s = A - (K.clientX - n.offset().left)
                                                 }
                                             }
                                             y.stop(true).css({
@@ -221,8 +214,7 @@ t().left)
                                 var A = n.width(),
                                     s = 0,
                                     C = function() {
-                                        B = (y.width() + y.position().left) / n.
-data("scrollamount") * 1000;
+                                        B = (y.width() + y.position().left) / n.data("scrollamount") * 1000;
                                         return B
                                     };
                                 var v = function() {
@@ -266,10 +258,8 @@ data("scrollamount") * 1000;
                                             var I;
                                             var J = H.clientX;
                                             A = y.position().left;
-                                            s = A - (H.clientX - n.offset().left
-);
-                                            a(this).on("mousemove", function(K)
-{
+                                            s = A - (H.clientX - n.offset().left);
+                                            a(this).on("mousemove", function(K) {
                                                 g = true;
                                                 I = K.clientX;
                                                 if (I > J) {
@@ -278,19 +268,16 @@ data("scrollamount") * 1000;
                                                     F = -1
                                                 }
                                                 J = I;
-                                                G = s + (K.clientX - n.offset().
-left);
+                                                G = s + (K.clientX - n.offset().left);
                                                 if (G < -y.width() && F < 0) {
                                                     G = n.width();
                                                     A = y.position().left;
-                                                    s = A - (K.clientX - n.offse
-t().left)
+                                                    s = A - (K.clientX - n.offset().left)
                                                 }
                                                 if (G > n.width() && F > 0) {
                                                     G = -y.width();
                                                     A = y.position().left;
-                                                    s = A - (K.clientX - n.offse
-t().left)
+                                                    s = A - (K.clientX - n.offset().left)
                                                 }
                                                 y.stop(true).css({
                                                     left: G
@@ -343,8 +330,7 @@ t().left)
                                     G = (F / n.data("scrollamount")) * 1000;
                                 if (parseFloat(y.css("left")) != 0) {
                                     F = (y.width() + n.width());
-                                    G = (F - (y.width() + parseFloat(y.css("left
-")))) / n.data("scrollamount") * 1000
+                                    G = (F - (y.width() + parseFloat(y.css("left")))) / n.data("scrollamount") * 1000
                                 }
                                 return G
                             };
@@ -400,33 +386,28 @@ t().left)
                                                 F = -1
                                             }
                                             J = I;
-                                            G = t + (K.clientX - n.offset().left
-);
+                                            G = t + (K.clientX - n.offset().left);
                                             if (!d.circular) {
                                                 if (G < -y.width() && F < 0) {
                                                     G = n.width();
                                                     A = y.position().left;
-                                                    t = A - (K.clientX - n.offse
-t().left)
+                                                    t = A - (K.clientX - n.offset().left)
                                                 }
                                                 if (G > n.width() && F > 0) {
                                                     G = -y.width();
                                                     A = y.position().left;
-                                                    t = A - (K.clientX - n.offse
-t().left)
+                                                    t = A - (K.clientX - n.offset().left)
                                                 }
                                             } else {
                                                 if (G < -y.width() && F < 0) {
                                                     G = 0;
                                                     A = y.position().left;
-                                                    t = A - (K.clientX - n.offse
-t().left)
+                                                    t = A - (K.clientX - n.offset().left)
                                                 }
                                                 if (G > 0 && F > 0) {
                                                     G = -y.width();
                                                     A = y.position().left;
-                                                    t = A - (K.clientX - n.offse
-t().left)
+                                                    t = A - (K.clientX - n.offset().left)
                                                 }
                                             }
                                             y.stop(true).css({
@@ -455,8 +436,7 @@ t().left)
                             if (d.runshort) {
                                 var t = 0;
                                 var C = function() {
-                                    B = (n.width() - y.position().left) / n.data
-("scrollamount") * 1000;
+                                    B = (n.width() - y.position().left) / n.data("scrollamount") * 1000;
                                     return B
                                 };
                                 var v = function() {
@@ -500,10 +480,8 @@ t().left)
                                             var I;
                                             var J = H.clientX;
                                             A = y.position().left;
-                                            t = A - (H.clientX - n.offset().left
-);
-                                            a(this).on("mousemove", function(K)
-{
+                                            t = A - (H.clientX - n.offset().left);
+                                            a(this).on("mousemove", function(K) {
                                                 g = true;
                                                 I = K.clientX;
                                                 if (I > J) {
@@ -512,19 +490,16 @@ t().left)
                                                     F = -1
                                                 }
                                                 J = I;
-                                                G = t + (K.clientX - n.offset().
-left);
+                                                G = t + (K.clientX - n.offset().left);
                                                 if (G < -y.width() && F < 0) {
                                                     G = n.width();
                                                     A = y.position().left;
-                                                    t = A - (K.clientX - n.offse
-t().left)
+                                                    t = A - (K.clientX - n.offset().left)
                                                 }
                                                 if (G > n.width() && F > 0) {
                                                     G = -y.width();
                                                     A = y.position().left;
-                                                    t = A - (K.clientX - n.offse
-t().left)
+                                                    t = A - (K.clientX - n.offset().left)
                                                 }
                                                 y.stop(true).css({
                                                     left: G
@@ -560,8 +535,7 @@ t().left)
                             if (d.circular) {
                                 if (!d.xml) {
                                     r();
-                                    E = -(y.height() + (y.height() - n.height())
-)
+                                    E = -(y.height() + (y.height() - n.height()))
                                 }
                             }
                             if (d.xml) {
@@ -575,8 +549,7 @@ t().left)
                                     G = (F / n.data("scrollamount")) * 1000;
                                 if (parseFloat(y.css("top")) != 0) {
                                     F = (F + n.height());
-                                    G = (F - (n.height() - parseFloat(y.css("top
-")))) / n.data("scrollamount") * 1000
+                                    G = (F - (n.height() - parseFloat(y.css("top")))) / n.data("scrollamount") * 1000
                                 }
                                 return G
                             };
@@ -622,8 +595,7 @@ t().left)
                                         var I;
                                         var J = H.clientY;
                                         strMoveTop = y.position().top;
-                                        t = strMoveTop - (H.clientY - n.offset()
-.top);
+                                        t = strMoveTop - (H.clientY - n.offset().top);
                                         a(this).on("mousemove", function(K) {
                                             g = true;
                                             I = K.clientY;
@@ -639,32 +611,24 @@ t().left)
                                             if (!d.circular) {
                                                 if (G < -y.height() && F < 0) {
                                                     G = n.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 if (G > n.height() && F > 0) {
                                                     G = -y.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                             } else {
                                                 if (G < -y.height() && F < 0) {
                                                     G = 0;
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 if (G > 0 && F > 0) {
                                                     G = -y.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                             }
                                             y.stop(true).css({
@@ -696,8 +660,7 @@ p;
                                 });
                                 var t = 0;
                                 var C = function() {
-                                    B = (y.height() + y.position().top) / n.data
-("scrollamount") * 1000;
+                                    B = (y.height() + y.position().top) / n.data("scrollamount") * 1000;
                                     return B
                                 };
                                 var v = function() {
@@ -741,10 +704,8 @@ p;
                                             var I;
                                             var J = H.clientY;
                                             strMoveTop = y.position().top;
-                                            t = strMoveTop - (H.clientY - n.offs
-et().top);
-                                            a(this).on("mousemove", function(K)
-{
+                                            t = strMoveTop - (H.clientY - n.offset().top);
+                                            a(this).on("mousemove", function(K) {
                                                 g = true;
                                                 I = K.clientY;
                                                 if (I > J) {
@@ -755,21 +716,16 @@ et().top);
                                                     }
                                                 }
                                                 J = I;
-                                                G = t + K.clientY - n.offset().t
-op;
+                                                G = t + K.clientY - n.offset().top;
                                                 if (G < -y.height() && F < 0) {
                                                     G = n.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 if (G > n.height() && F > 0) {
                                                     G = -y.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 y.stop(true).css({
                                                     top: G
@@ -823,8 +779,7 @@ p;
                                     G = (F / n.data("scrollamount")) * 1000;
                                 if (parseFloat(y.css("top")) != 0) {
                                     F = (y.height() + n.height());
-                                    G = (F - (y.height() + parseFloat(y.css("top
-")))) / n.data("scrollamount") * 1000
+                                    G = (F - (y.height() + parseFloat(y.css("top")))) / n.data("scrollamount") * 1000
                                 }
                                 return G
                             };
@@ -870,8 +825,7 @@ p;
                                         var I;
                                         var J = H.clientY;
                                         strMoveTop = y.position().top;
-                                        t = strMoveTop - (H.clientY - n.offset()
-.top);
+                                        t = strMoveTop - (H.clientY - n.offset().top);
                                         a(this).on("mousemove", function(K) {
                                             g = true;
                                             I = K.clientY;
@@ -887,32 +841,24 @@ p;
                                             if (!d.circular) {
                                                 if (G < -y.height() && F < 0) {
                                                     G = n.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 if (G > n.height() && F > 0) {
                                                     G = -y.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                             } else {
                                                 if (G < -y.height() && F < 0) {
                                                     G = 0;
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 if (G > 0 && F > 0) {
                                                     G = -y.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                             }
                                             y.stop(true).css({
@@ -941,8 +887,7 @@ p;
                             if (d.runshort) {
                                 var t = 0;
                                 var C = function() {
-                                    B = (n.height() - y.position().top) / n.data
-("scrollamount") * 1000;
+                                    B = (n.height() - y.position().top) / n.data("scrollamount") * 1000;
                                     return B
                                 };
                                 var v = function() {
@@ -986,10 +931,8 @@ p;
                                             var I;
                                             var J = H.clientY;
                                             strMoveTop = y.position().top;
-                                            t = strMoveTop - (H.clientY - n.offs
-et().top);
-                                            a(this).on("mousemove", function(K)
-{
+                                            t = strMoveTop - (H.clientY - n.offset().top);
+                                            a(this).on("mousemove", function(K) {
                                                 g = true;
                                                 I = K.clientY;
                                                 if (I > J) {
@@ -1000,21 +943,16 @@ et().top);
                                                     }
                                                 }
                                                 J = I;
-                                                G = t + K.clientY - n.offset().t
-op;
+                                                G = t + K.clientY - n.offset().top;
                                                 if (G < -y.height() && F < 0) {
                                                     G = n.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 if (G > n.height() && F > 0) {
                                                     G = -y.height();
-                                                    strMoveTop = y.position().to
-p;
-                                                    t = strMoveTop - (K.clientY
-- n.offset().top)
+                                                    strMoveTop = y.position().top;
+                                                    t = strMoveTop - (K.clientY - n.offset().top)
                                                 }
                                                 y.stop(true).css({
                                                     top: G
@@ -1055,8 +993,7 @@ p;
                                 var t = w.eq(r);
                                 var u = t.text();
                                 var v = a("<span>").text(u).appendTo(n);
-                                if (d.direction == "left" || d.direction == "rig
-ht") {
+                                if (d.direction == "left" || d.direction == "right") {
                                     v.css({
                                         display: "inline-block",
                                         textAlign: "right"
@@ -1067,8 +1004,7 @@ ht") {
                                         })
                                     }
                                 }
-                                if (d.direction == "down" || d.direction == "up"
-) {
+                                if (d.direction == "down" || d.direction == "up") {
                                     v.css({
                                         display: "block",
                                         textAlign: "left"
@@ -1110,9 +1046,7 @@ ht") {
             d.off("mouseup");
             d.off("mouseleave");
             d.off("mousemove");
-            d.removeClass("noStop").removeClass("str_vertical").removeClass("str
-_active").removeClass("no_drag").removeClass("str_static").removeClass("str_righ
-t").removeClass("str_down");
+            d.removeClass("noStop").removeClass("str_vertical").removeClass("str_active").removeClass("no_drag").removeClass("str_static").removeClass("str_right").removeClass("str_down");
             var f = d.attr("style");
             if (f) {
                 var m = f.split(";");

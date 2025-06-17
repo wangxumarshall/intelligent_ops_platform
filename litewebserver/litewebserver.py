@@ -35,6 +35,13 @@ def get_path_details(base_path, subpath=""):
 
 # --- Routes ---
 @app.route('/')
+def main_portal():
+    return render_template('main_portal.html')
+
+@app.route('/scheduler_graph_tool/')
+def serve_scheduler_graph():
+    return render_template('scheduler_graph.html')
+
 @app.route('/browse/')
 @app.route('/browse/<path:subpath>')
 def browse_files(subpath=""):

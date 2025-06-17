@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scheduler Trace Visualizer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles to complement Tailwind */
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+        }}
+
+        .metric-card {{
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }}
+
+        #graph-container {{
+            flex-grow: 1;
+            position: relative;
+            cursor: move;
+        }}
+
+        svg {{
+            width: 100%;
+            height: 100%;
+            display: block;
+        }}
+
+        .node, .link-group {{
+            cursor: pointer;
+        }}
+
+        #tooltip {{
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }}
+    </style>
+</head>
+<body>
+
+    <div class="flex flex-col h-screen w-full p-4 md:p-6 lg:p-8 bg-gray-50">
+        <!-- Compact Control Bar -->
+		<h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">RTOS V2X Scheduler Trace Graph Visualizer</h1>
+        <div class="metric-card p-3 mb-4">
+             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                 <!-- File Input -->
+                 <div class="flex items-center">
+                    <input type="file" id="fileInput" accept=".txt,.log" class="block w-full text-sm text-gray-500
+                        file:mr-3 file:py-1.5 file:px-3
+                        file:rounded-full file:border-0 file:text-sm file:font-semibold
+                        file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                 </div>
+				 <!-- Metrics -->
+                 <div class="flex items-center space-x-4 text-sm">
+                    <div class="flex items-baseline space-x-1.5">
+                        <span class="font-semibold text-gray-600">仅支持V2X调度轨迹数据格式
+						<a href="https://3ms.huawei.com/next/groups/index.html#/wiki/detail?groupId=3828267&wikiId=6571498" class="text-indigo-600 hover:underline">[思路来源] </a>
+						<a href="https://wiki.huawei.com/domains/12565/wiki/179215/WIKI202501105697774" class="text-indigo-600 hover:underline">[调度数据采集]</a>
+						</span>
+                    </div>
+                 </div>
+                 <!-- Analyze Button -->
+                 <button id="analyzeBtn" class="px-5 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75">Analyze</button>
+
+                 <div class="h-6 border-l border-gray-300 mx-2"></div>
+
+                 <!-- Metrics -->
+                 <div class="flex items-center space-x-4 text-sm">
+                    <div class="flex items-baseline space-x-1.5">
+                        <span class="font-semibold text-gray-600">Nodes:</span>
+                        <p id="total-nodes" class="font-bold text-indigo-600">-</p>
+                    </div>
+                    <div class="flex items-baseline space-x-1.5">
+                        <span class="font-semibold text-gray-600">Edges:</span>
+                        <p id="total-edges" class="font-bold text-indigo-600">-</p>
+                    </div>
+                     <div class="flex items-baseline space-x-1.5">
+                        <span class="font-semibold text-gray-600">Switches:</span>
+                        <p id="total-switches" class="font-bold text-indigo-600">-</p>
+                    </div>
+                 </div>
+
+                <div class="h-6 border-l border-gray-300 mx-2"></div>
+
+                 <!-- Graph Controls -->
+                <div id="graph-controls" class="hidden items-center space-x-2">
+                    <label for="weightThreshold" class="text-sm font-medium text-gray-700 whitespace-nowrap">最小调度次数:</label>
+                    <input type="number" id="weightThreshold" value="1" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                </div>
+             </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="metric-card flex-grow flex flex-col">
+            <div id="graph-container" class="flex-grow flex flex-col relative">
+                 <div id="placeholder" class="text-center text-gray-500 flex items-center justify-center h-full">
+                    Please upload your trace data file to begin analysis.
+                 </div>
+                 <svg id="graph-svg"></svg>
+                 <div id="tooltip"></div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {{
+            // --- DOM Element References ---
+            const fileInput = document.getElementById('fileInput');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const weightThresholdInput = document.getElementById('weightThreshold');
+            const tooltip = d3.select("#tooltip");
+            const placeholder = document.getElementById('placeholder');
+            const graphControls = document.getElementById('graph-controls');
+
+            // UI elements for summary data
+            const totalNodesEl = document.getElementById('total-nodes');
+            const totalEdgesEl = document.getElementById('total-edges');
+            const totalSwitchesEl = document.getElementById('total-switches');
+
+            // --- State Variables ---
+            let fullGraphData = {{ nodes: [], links: [] }};
+            let simulation; // To hold the D3 simulation
+
+            // --- Event Listeners ---
+            analyzeBtn.addEventListener('click', handleAnalysis);
+            weightThresholdInput.addEventListener('input', () => drawGraph()); // Redraw on threshold change
+
+            /**
+             * Handles the file reading, parsing, and initial graph drawing.
+             */
+            function handleAnalysis() {{
+                const file = fileInput.files[0];
+                if (!file) {{
+                    console.warn('No file selected.');
+                    fileInput.focus();
+                    return;
+                }}
+
+                placeholder.textContent = 'Analyzing...';
+                placeholder.style.display = 'flex';
+                document.getElementById('graph-svg').innerHTML = '';
+
+                if (simulation) simulation.stop(); // Stop any previous simulation
+
+                const reader = new FileReader();
+                reader.onload = (event) => {{
+                    const text = event.target.result;
+                    fullGraphData = parseSchedData(text);
+                    if (fullGraphData.nodes.length > 0) {{
+                        placeholder.style.display = 'none';
+                        graphControls.classList.remove('hidden');
+                        graphControls.classList.add('flex');
+
+                        updateMetrics(fullGraphData);
+                        drawGraph();
+                    }} else {{
+                        placeholder.textContent = 'Could not parse data from file. Please check the format.';
+                    }}
+                }};
+                reader.onerror = (error) => {{
+                    placeholder.textContent = 'Error reading file.';
+                    console.error('Error reading file:', error);
+                }};
+                reader.readAsText(file);
+            }}
+
+            /**
+             * Updates the metric cards with data from the analysis.
+             */
+            function updateMetrics({{nodes, links}}) {{
+                totalNodesEl.textContent = nodes.length.toLocaleString();
+                totalEdgesEl.textContent = links.length.toLocaleString();
+                const totalSwitches = links.reduce((sum, link) => sum + link.weight, 0);
+                totalSwitchesEl.textContent = totalSwitches.toLocaleString();
+            }}
+
+            /**
+             * Parses the raw scheduler trace data from the text file.
+             */
+            function parseSchedData(text) {{
+                const lines = text.split('
+');
+                const nodeMap = new Map();
+                const linkMap = new Map();
+                const regex = /prev_comm=([\S]+)\s+prev_pid=\d+\s+prev_tid=([\S]+)[\s\S]*?==>\s+next_comm=([\S]+)\s+next_tid=([\S]+)/;
+
+                for (const line of lines) {{
+                    const match = line.match(regex);
+                    if (match) {{
+                        const [, prev_comm, prev_tid, next_comm, next_tid] = match;
+                        const sourceId = `${prev_comm}/${prev_tid}`;
+                        const targetId = `${next_comm}/${next_tid}`;
+
+                        if (sourceId === targetId) continue;
+
+                        if (!nodeMap.has(sourceId)) nodeMap.set(sourceId, {{ id: sourceId }});
+                        if (!nodeMap.has(targetId)) nodeMap.set(targetId, {{ id: targetId }});
+
+                        const linkKey = [sourceId, targetId].sort().join('--');
+
+                        if (linkMap.has(linkKey)) {{
+                            linkMap.get(linkKey).weight++;
+                        }} else {{
+                            linkMap.set(linkKey, {{
+                                source: sourceId,
+                                target: targetId,
+                                weight: 1
+                            }});
+                        }}
+                    }}
+                }}
+
+                return {{
+                    nodes: Array.from(nodeMap.values()),
+                    links: Array.from(linkMap.values())
+                }};
+            }}
+
+            /**
+             * Draws or updates the graph based on the current threshold.
+             */
+            function drawGraph() {{
+                if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) return;
+
+                const threshold = +weightThresholdInput.value;
+                const {{ nodes, links }} = fullGraphData;
+
+                const filteredLinks = links.filter(link => link.weight >= threshold);
+                const maxWeight = d3.max(links, d => d.weight) || 1;
+
+                const container = document.getElementById('graph-container');
+                const svg = d3.select("#graph-svg");
+
+                svg.selectAll("*").remove();
+
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+
+                const g = svg.append("g");
+
+                // --- D3 Simulation Setup ---
+                simulation = d3.forceSimulation(nodes)
+                    .force("link", d3.forceLink(links).id(d => d.id)
+                        .strength(d => 0.1 * Math.sqrt(d.weight / maxWeight)))
+                    .force("charge", d3.forceManyBody().strength(-400))
+                    .force("center", d3.forceCenter(width / 2, height / 2))
+                    .force("collide", d3.forceCollide().radius(15));
+
+                // --- Draw Links (Grouped Line + Text) ---
+                const linkGroup = g.append("g")
+                    .selectAll("g")
+                    .data(filteredLinks)
+                    .join("g")
+                    .attr("class", "link-group");
+
+                linkGroup.append("line")
+                    .attr("stroke", "#999")
+                    .attr("stroke-opacity", 0.6)
+                    .attr("stroke-width", d => Math.min(Math.sqrt(d.weight), 8) * 0.5 + 0.5);
+
+                linkGroup.append("text")
+                    .text(d => d.weight)
+                    .attr("font-size", "10px")
+                    .attr("font-family", "sans-serif")
+                    .attr("fill", "#333")
+                    .attr("stroke", "white")
+                    .attr("stroke-width", 0.4)
+                    .attr("paint-order", "stroke")
+                    .style("display", "none") // Hide text by default
+                    .style("pointer-events", "none");
+
+                linkGroup
+                    .on("mouseover", function(event, d) {{
+                        d3.select(this).select('text').style('display', 'block'); // Show text on hover
+                        tooltip.style("opacity", 1).html(`切换次数: ${d.weight}`);
+                    }})
+                    .on("mousemove", (event) => {{
+                         tooltip.style("left", (event.pageX + 15) + "px")
+                                .style("top", (event.pageY - 28) + "px");
+                    }})
+                    .on("mouseout", function() {{
+                        d3.select(this).select('text').style('display', 'none'); // Hide text on mouseout
+                        tooltip.style("opacity", 0);
+                    }});
+
+
+                // --- Draw Nodes (Grouped Circle + Text) ---
+                const nodeGroup = g.append("g")
+                    .selectAll("g")
+                    .data(nodes)
+                    .join("g")
+                    .attr("class", "node");
+
+                nodeGroup.append("circle")
+                    .attr("r", 8)
+                    .attr("fill", "#4f46e5")
+                    .attr("stroke", "#fff")
+                    .attr("stroke-width", 1.5);
+
+                nodeGroup.append("text")
+                    .text(d => d.id)
+                    .attr("x", 12)
+                    .attr("y", 4)
+                    .attr("font-size", "12px")
+                    .attr("font-family", "monospace")
+                    .attr("fill", "#333")
+                    .style("display", "none") // Hidden by default
+                    .style("pointer-events", "none");
+
+                // --- Interaction Handlers on the Node Group ---
+                nodeGroup.on("mouseover", function(event, d) {{
+                        d3.select(this).select('text').style('display', 'block');
+                        tooltip.style("opacity", 1).html(`任务: ${d.id}`);
+                    }})
+                    .on("mousemove", (event) => {{
+                        tooltip.style("left", (event.pageX + 15) + "px")
+                               .style("top", (event.pageY - 28) + "px");
+                    }})
+                    .on("mouseout", function() {{
+                        d3.select(this).select('text').style('display', 'none');
+                        tooltip.style("opacity", 0);
+                    }});
+
+                // --- Drag and Zoom Handlers ---
+                const drag = d3.drag()
+                    .on("start", (event, d) => {{
+                        if (!event.active) simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    }})
+                    .on("drag", (event, d) => {{
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    }})
+                    .on("end", (event, d) => {{
+                        if (!event.active) simulation.alphaTarget(0);
+                        d.fx = null;
+                        d.fy = null;
+                    }});
+
+                nodeGroup.call(drag);
+
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 10])
+                    .on("zoom", (event) => {{
+                        g.attr("transform", event.transform);
+                    }});
+
+                svg.call(zoom);
+
+                // --- Simulation Ticker ---
+                simulation.on("tick", () => {{
+                    linkGroup.select("line")
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+
+                    linkGroup.select("text")
+                        .attr("x", d => (d.source.x + d.target.x) / 2)
+                        .attr("y", d => (d.source.y + d.target.y) / 2);
+
+                    nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
+                }});
+            }});
+    </script>
+
+</body>
+</html>

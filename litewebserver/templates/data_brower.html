@@ -115,6 +115,8 @@
                 <td>
                     {% if item.type == 'file' %}
                         <a href="{{ url_for('download_file', filepath=item.path) }}" download>Download</a>
+                        &nbsp; <!-- Add a space for separation -->
+                        <button onclick="transferFile('{{ item.path }}')">Transfer</button>
                     {% endif %}
                 </td>
             </tr>
@@ -179,6 +181,51 @@
             console.error('Search input or table body not found for search functionality.');
         }
     });
+
+    function transferFile(filepath) {
+        if (!filepath) {
+            alert('Error: Filepath is missing.');
+            return;
+        }
+        console.log('Attempting to transfer file:', filepath); // For debugging
+
+        // Optional: Disable button or show loading state here
+
+        fetch(`/transfer/${filepath}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json' // Optional: if sending JSON body, not needed for empty body
+            }
+            // body: JSON.stringify({ filepath: filepath }) // Optional: if server expects filepath in body
+        })
+        .then(response => {
+            if (!response.ok) {
+                // Try to get error message from server response
+                return response.json().then(err => {
+                    throw new Error(err.message || `HTTP error! status: ${response.status}`);
+                }).catch(() => {
+                    // If response is not JSON or no message, throw generic error
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                alert(`File transferred successfully. New file: ${data.new_file}`);
+                location.reload(); // Refresh the page to show the new file
+            } else {
+                alert(`Error transferring file: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error during transfer operation:', error);
+            alert(`An error occurred: ${error.message}`);
+        })
+        .finally(() => {
+            // Optional: Re-enable button or hide loading state here
+        });
+    }
 </script>
 </body>
 </html>

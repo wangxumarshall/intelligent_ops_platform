@@ -1,7 +1,8 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, abort, flash
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, abort, flash, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
+import subprocess
 
 app = Flask(__name__)
 
@@ -194,6 +195,58 @@ def upload_file():
 
     return redirect(url_for('browse_files', subpath=target_subdir))
 
+@app.route('/transfer/<path:filepath>', methods=['POST'])
+def transfer_file(filepath):
+    # Securely construct the absolute path for the old file
+    old_file_abs = os.path.abspath(os.path.join(app.config['BASE_SERVED_DIR'], filepath.strip('/')))
+
+    # Security Check: Ensure the file is within BASE_SERVED_DIR and is a file
+    if not old_file_abs.startswith(app.config['BASE_SERVED_DIR']) or not os.path.isfile(old_file_abs):
+        app.logger.warning(f"Transfer attempt failed: File not found or access denied for {filepath}")
+        return jsonify({'status': 'error', 'message': 'File not found or access denied.'}), 404
+
+    # Generate new filename (e.g., oldname.txt -> oldname.db)
+    base, ext = os.path.splitext(os.path.basename(filepath))
+    new_filename_relative = base + ".db" # Relative to its own directory
+
+    # Construct absolute path for the new file in the same directory
+    new_file_abs = os.path.join(os.path.dirname(old_file_abs), new_filename_relative)
+
+    # Command to execute
+    # Ensure trace_streamer is in PATH or provide full path to it if necessary
+    command = ['trace_streamer', old_file_abs, '-e', new_file_abs]
+    app.logger.info(f"Executing command: {' '.join(command)}")
+
+    try:
+        # Execute the command
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+
+        if result.returncode == 0:
+            app.logger.info(f"File transferred successfully: {filepath} -> {new_filename_relative}")
+            return jsonify({
+                'status': 'success',
+                'message': 'File transferred successfully.',
+                'new_file': new_filename_relative
+            }), 200
+        else:
+            app.logger.error(f"Error transferring file {filepath}. Command stderr: {result.stderr}")
+            return jsonify({
+                'status': 'error',
+                'message': f"Error during conversion: {result.stderr.strip()}"
+            }), 500
+    except FileNotFoundError:
+        app.logger.error(f"Error transferring file {filepath}: trace_streamer command not found.")
+        return jsonify({
+            'status': 'error',
+            'message': 'Error: trace_streamer command not found. Please ensure it is installed and in PATH.'
+        }), 500
+    except Exception as e:
+        app.logger.error(f"An unexpected error occurred during transfer of {filepath}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f"An unexpected server error occurred: {str(e)}"
+        }), 500
+
 # --- Error Handlers ---
 @app.errorhandler(403)
 def forbidden(error):
@@ -298,4 +351,7 @@ def log_click():
         return "Error logging click", 500
 
 if __name__ == '__main__':
+    # Add basic logging if you want to see app.logger outputs
+    # import logging
+    # logging.basicConfig(level=logging.INFO)
     app.run(debug=True, host='0.0.0.0', port=8080)

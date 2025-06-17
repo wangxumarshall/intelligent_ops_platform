@@ -6,7 +6,7 @@
 <script type="text/javascript" src="../static/js/jquery.js"></script>
 <script type="text/javascript" src="../static/js/echarts.min.js"></script>
 <script type="text/javascript" src="../static/js/js.js"></script>
-<script type="text/javascript" src="../static/js/jquery.liMarquee.js"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/jquery.liMarquee.js') }}"></script>
 <script type="text/javascript" src="../static/js/jquery.cxselect.min.js"></script>
 <link href="../static/css/comon0.css" rel="stylesheet"/>
 </head>
@@ -102,12 +102,8 @@ function time()
 <script type="text/javascript" src="../static/js/china.js"></script>
 <script type="text/javascript" src="../static/js/area_echarts.js"></script>
 <script>
-$(function (){
-	$('.jin').liMarquee({
-		direction: 'up',//身上滚动
-		runshort: false,//内容不足时不滚动
-		scrollamount: 20
-	});
+$(window).on('load', function() { // Ensure all content is loaded
+    $('.marquee').liMarquee(); // Initialize on elements with class 'marquee'
 });
 </script>
 </body>

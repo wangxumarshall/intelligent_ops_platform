@@ -42,6 +42,14 @@ def main_portal():
 def serve_scheduler_graph():
     return render_template('scheduler_graph.html')
 
+@app.route('/board.html')
+def board():
+    return render_template('board.html')
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory(os.path.join(app.root_path, 'static'), filename)
+
 @app.route('/browse/')
 @app.route('/browse/<path:subpath>')
 def browse_files(subpath=""):

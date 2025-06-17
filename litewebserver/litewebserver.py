@@ -91,9 +91,13 @@ def parse_click_logs(log_dir_path=None): # Added optional log_dir_path
 # --- Routes ---
 @app.route('/')
 def main_portal():
-    # Intentionally not passing log_dir_path, so it uses the default
+    # click_stats_data is no longer needed for main_portal.html directly
+    return render_template('main_portal.html')
+
+@app.route('/board_detail')
+def board_detail_page():
     click_stats_data = parse_click_logs()
-    return render_template('main_portal.html', click_stats=click_stats_data)
+    return render_template('board_detail.html', click_stats=click_stats_data)
 
 @app.route('/scheduler_graph_tool/')
 def serve_scheduler_graph():

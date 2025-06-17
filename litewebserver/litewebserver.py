@@ -33,10 +33,67 @@ def get_path_details(base_path, subpath=""):
 
     return current_dir_abs
 
+# --- Click Log Parsing ---
+def parse_click_logs(log_dir_path=None): # Added optional log_dir_path
+    if log_dir_path is None:
+        log_dir = os.path.join(os.path.dirname(__file__), 'log', 'click')
+    else:
+        log_dir = log_dir_path
+
+    click_stats = {}
+
+    if not os.path.exists(log_dir) or not os.path.isdir(log_dir):
+        return click_stats # Return empty if log dir doesn't exist
+
+    for filename in os.listdir(log_dir):
+        if filename.endswith(".log"):
+            filepath = os.path.join(log_dir, filename)
+            try:
+                with open(filepath, 'r') as f:
+                    for line in f:
+                        try:
+                            # Example line: 2023-10-27 - IP: 127.0.0.1 - Link: /some/link - Card: My Card
+                            parts = line.strip().split(' - ')
+                            if len(parts) < 4: # Basic check for enough parts
+                                print(f"Skipping malformed line (not enough parts): {line.strip()} in {filename}")
+                                continue
+
+                            date_str = parts[0]
+
+                            card_part = parts[3] # "Card: My Card"
+                            if not card_part.startswith("Card: "):
+                                print(f"Skipping malformed line (missing 'Card: ' prefix): {line.strip()} in {filename}")
+                                continue
+                            card_name = card_part.split("Card: ", 1)[1]
+
+                            # Validate date format and extract Year-Month
+                            try:
+                                log_date = datetime.strptime(date_str, '%Y-%m-%d')
+                                year_month = log_date.strftime('%Y-%m')
+                            except ValueError:
+                                print(f"Skipping malformed line (invalid date format '{date_str}'): {line.strip()} in {filename}")
+                                continue
+
+                            key = (year_month, card_name)
+                            click_stats[key] = click_stats.get(key, 0) + 1
+                        except Exception as e:
+                            print(f"Error parsing line '{line.strip()}' in {filename}: {e}")
+                            # Continue to next line if one line is bad
+            except Exception as e:
+                print(f"Error reading or processing file {filepath}: {e}")
+                # Continue to next file if one file is problematic
+
+    # Convert tuple keys to string keys for easier template handling if necessary,
+    # e.g., "YYYY-MM, Card Name"
+    string_key_click_stats = {f"{k[0]}, {k[1]}": v for k, v in click_stats.items()}
+    return string_key_click_stats
+
 # --- Routes ---
 @app.route('/')
 def main_portal():
-    return render_template('main_portal.html')
+    # Intentionally not passing log_dir_path, so it uses the default
+    click_stats_data = parse_click_logs()
+    return render_template('main_portal.html', click_stats=click_stats_data)
 
 @app.route('/scheduler_graph_tool/')
 def serve_scheduler_graph():
@@ -203,6 +260,38 @@ def create_folder():
         print(f"Error creating folder '{new_folder_path}': {e}")
 
     return redirect(url_for('browse_files', subpath=current_subdir))
+
+# --- Click Logging ---
+@app.route('/log_click', methods=['POST'])
+def log_click():
+    try:
+        data = request.get_json()
+        link = data.get('link')
+        card_name = data.get('card_name')
+
+        if not link or not card_name:
+            return "Missing data", 400
+
+        # Ensure the log directory exists
+        log_dir = os.path.join(os.path.dirname(__file__), 'log', 'click')
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Log data
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        log_file_path = os.path.join(log_dir, f"{date_str}.log")
+
+        ip_address = request.remote_addr
+        timestamp = datetime.now().strftime('%Y-%m-%d') # Only date for timestamp
+
+        log_entry = f"{timestamp} - IP: {ip_address} - Link: {link} - Card: {card_name}\n"
+
+        with open(log_file_path, 'a') as f:
+            f.write(log_entry)
+
+        return "Log successful", 200
+    except Exception as e:
+        print(f"Error logging click: {e}")
+        return "Error logging click", 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)

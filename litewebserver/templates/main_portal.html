@@ -185,7 +185,37 @@
 
         <!-- 用于展示可扩展性的占位符 -->
         <footer class="text-center mt-12 md:mt-20 pt-8 border-t border-slate-200">
-             <p class="text-slate-500"><a href="/board.html">看板</a>未来更多功能模块将在此处呈现。</p>
+            <div class="mb-8"> <!-- Added margin-bottom for spacing -->
+                <h3 class="text-xl font-semibold mb-4 text-slate-700">Link Click Statistics</h3>
+                {% if click_stats and click_stats|length > 0 %}
+                    <div class="overflow-x-auto bg-white p-4 rounded-lg shadow">
+                        <table class="table-auto w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50">
+                                    <th class="border p-3 text-slate-600 font-medium">Year-Month</th>
+                                    <th class="border p-3 text-slate-600 font-medium">Card Name</th>
+                                    <th class="border p-3 text-slate-600 font-medium text-center">Click Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key, count in click_stats.items() %}
+                                {% set parts = key.split(',', 1) %}
+                                {% set year_month = parts[0] %}
+                                {% set card_name = parts[1] if parts|length > 1 else "Unknown" %}
+                                <tr class="hover:bg-slate-50">
+                                    <td class="border p-3">{{ year_month.strip() }}</td>
+                                    <td class="border p-3">{{ card_name.strip() }}</td>
+                                    <td class="border p-3 text-center">{{ count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-slate-500">No click data available yet.</p>
+                {% endif %}
+            </div>
+            <p class="text-slate-500"><a href="/board.html" class="text-indigo-600 hover:underline">看板</a>未来更多功能模块将在此处呈现。</p>
         </footer>
 
     </div>
@@ -193,26 +223,66 @@
     <!-- 新增脚本: 强制在新窗口中打开所有链接 -->
 {% raw %}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {{
-            // 选择页面中所有的 <a> 标签
-            const allLinks = document.querySelectorAll('a');
+        document.addEventListener('DOMContentLoaded', function() {
+            const featureCards = document.querySelectorAll('a.feature-card');
 
-            allLinks.forEach(link => {{
-                // 为每个链接添加点击事件监听器
-                link.addEventListener('click', function(event) {{
-                    // 1. 阻止链接的默认跳转行为
+            featureCards.forEach(card => {
+                card.addEventListener('click', function(event) {
+                    event.preventDefault(); // Prevent default navigation
+
+                    const link = this.getAttribute('href');
+                    const cardNameElement = this.querySelector('h2');
+                    const cardName = cardNameElement ? cardNameElement.textContent.trim() : 'Unknown Card';
+
+                    // Data to send
+                    const clickData = {
+                        link: link,
+                        card_name: cardName
+                    };
+
+                    // Function to navigate
+                    const navigateToLink = () => {
+                        if (link) {
+                            window.open(link, '_blank');
+                        }
+                    };
+
+                    // Send POST request to /log_click
+                    fetch('/log_click', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(clickData),
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            // Log error if request fails
+                            console.error('Failed to log click, status:', response.status);
+                        }
+                        // Still navigate even if logging fails or succeeds
+                        navigateToLink();
+                    })
+                    .catch(error => {
+                        console.error('Error logging click:', error);
+                        // Still navigate even if there's a network error
+                        navigateToLink();
+                    });
+                });
+            });
+
+            // Handle other links on the page (not feature cards) to open in new tab
+            const allOtherLinks = document.querySelectorAll('a:not(.feature-card)');
+            allOtherLinks.forEach(link => {
+                link.addEventListener('click', function(event) {
                     event.preventDefault();
-
-                    // 2. 获取链接的 href 属性值
                     const url = this.getAttribute('href');
-
-                    // 3. 确保URL存在，然后使用 window.open 在新窗口中打开
-                    if (url) {{
+                    if (url) {
                         window.open(url, '_blank');
-                    }}
-                }});
-            }});
-        }});
+                    }
+                });
+            });
+        });
     </script>
 {% endraw %}
 

@@ -115,8 +115,10 @@
                 <td>
                     {% if item.type == 'file' %}
                         <a href="{{ url_for('download_file', filepath=item.path) }}" download>Download</a>
-                        &nbsp; <!-- Add a space for separation -->
-                        <button onclick="transferFile('{{ item.path }}')">Transfer</button>
+                        {% if item.name.endswith('.data') or item.name.endswith('.txt') %}
+                            &nbsp; <!-- Add a space for separation -->
+                            <button onclick="transferFile('{{ item.path }}')">Transfer</button>
+                        {% endif %}
                     {% endif %}
                 </td>
             </tr>

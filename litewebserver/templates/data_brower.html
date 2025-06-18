@@ -114,10 +114,14 @@
                 <td>{{ item.last_modified if item.last_modified is not none else '-' }}</td>
                 <td>
                     {% if item.type == 'file' %}
-                        <a href="{{ url_for('download_file', filepath=item.path) }}" download>Download</a>
+                        <a href="{{ url_for('download_file', filepath=item.path) }}" download>下载</a>
                         {% if item.name.endswith('.data') or item.name.endswith('.txt') %}
-                            &nbsp; <!-- Add a space for separation -->
-                            <button onclick="transferFile('{{ item.path }}')">Transfer</button>
+                            &nbsp;
+                            <button onclick="transferFile('{{ item.path }}')">格式转换</button>
+                        {% endif %}
+                        {% if item.name.endswith('.data') or item.name.endswith('.txt') or item.name.endswith('.db') %}
+                            &nbsp;
+                            <a href="https://rtosdfx.rnd.com/application/?trace={{ url_for('download_file', filepath=item.path, _external=True) }}&link=true" target="_blank">可视分析</a>
                         {% endif %}
                     {% endif %}
                 </td>

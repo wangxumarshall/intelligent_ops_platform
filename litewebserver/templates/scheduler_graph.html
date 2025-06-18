@@ -115,6 +115,28 @@
             </div>
         </div>
 
+        <!-- Table for Filtered Links -->
+        <div class="metric-card p-4 mt-4"> <!-- Added mt-4 for spacing -->
+            <h2 class="text-xl font-semibold text-gray-700 mb-3">Filtered Links Table</h2>
+            <div class="overflow-x-auto"> <!-- Added for responsiveness on small screens -->
+                <table id="links-table" class="w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">Node A</th>
+                            <th scope="col" class="px-6 py-3">Node B</th>
+                            <th scope="col" class="px-6 py-3">Switches</th>
+                        </tr>
+                    </thead>
+                    <tbody id="links-table-body">
+                        <!-- Rows will be inserted here by JavaScript -->
+                        <tr>
+                            <td colspan="3" class="px-6 py-4 text-center">Upload a file and adjust threshold to see data.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
 {% raw %}
@@ -132,6 +154,7 @@
             const totalNodesEl = document.getElementById('total-nodes');
             const totalEdgesEl = document.getElementById('total-edges');
             const totalSwitchesEl = document.getElementById('total-switches');
+            const linksTableBody = document.getElementById('links-table-body');
 
             // --- State Variables ---
             let fullGraphData = {{ nodes: [], links: [] }};
@@ -155,6 +178,7 @@
                 placeholder.textContent = 'Analyzing...';
                 placeholder.style.display = 'flex';
                 document.getElementById('graph-svg').innerHTML = '';
+                linksTableBody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center">Analyzing...</td></tr>';
 
                 if (simulation) simulation.stop(); // Stop any previous simulation
 
@@ -171,6 +195,7 @@
                         drawGraph();
                     }} else {{
                         placeholder.textContent = 'Could not parse data from file. Please check the format.';
+                        linksTableBody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center">Could not parse data from file. Please check the format.</td></tr>';
                     }}
                 }};
                 reader.onerror = (error) => {{
@@ -242,6 +267,35 @@
                 const {{ nodes, links }} = fullGraphData;
 
                 const filteredLinks = links.filter(link => link.weight >= threshold);
+
+                // Clear previous table rows
+                linksTableBody.innerHTML = '';
+
+                if (filteredLinks.length === 0) {{
+                    const row = linksTableBody.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = 3;
+                    cell.textContent = 'No links meet the current threshold.';
+                    cell.className = 'px-6 py-4 text-center';
+                }} else {{
+                    filteredLinks.forEach(link => {{
+                        const row = linksTableBody.insertRow();
+                        row.className = 'bg-white border-b'; // Added for styling
+
+                        const cellNodeA = row.insertCell();
+                        cellNodeA.textContent = link.source.id !== undefined ? link.source.id : link.source;
+                        cellNodeA.className = 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap'; // Added for styling
+
+                        const cellNodeB = row.insertCell();
+                        cellNodeB.textContent = link.target.id !== undefined ? link.target.id : link.target;
+                        cellNodeB.className = 'px-6 py-4'; // Added for styling
+
+                        const cellSwitches = row.insertCell();
+                        cellSwitches.textContent = link.weight;
+                        cellSwitches.className = 'px-6 py-4'; // Added for styling
+                    }});
+                }}
+
                 const maxWeight = d3.max(links, d => d.weight) || 1;
 
                 const container = document.getElementById('graph-container');

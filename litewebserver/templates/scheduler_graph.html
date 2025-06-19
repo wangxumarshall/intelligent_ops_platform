@@ -1271,17 +1271,30 @@
 
                 if (clickedTaskLink) {
                     const nodeId = clickedTaskLink.getAttribute('data-node-id');
-                    console.log(`Task link clicked: ${nodeId}`);
 
-                    if (highlightedLinkFromTable) { // Clear single-link highlight if active
-                        highlightedLinkFromTable = null;
-                        // Visual reset of single-link highlight will be handled by highlightNodeConnections or drawGraph
+                    console.log(`Task link clicked for BFS: ${nodeId}`);
+
+                    if (highlightedLinkFromTable) {
+                        updateGraphForTableLinkHighlight(true); // Clear single-link effects and sets highlightedLinkFromTable = null
                     }
-                    // No need to call updateGraphForTableLinkHighlight(true) as highlightNodeConnections will redraw/restyle.
 
-                    highlightNodeConnections(nodeId); // This function already handles clearing previous BFS states.
-                                                    // It also now clears highlightedLinkFromTable.
-                    targetRow.classList.add('bg-indigo-100'); // Highlight the row of the clicked task link
+                    // Clear task-link specific styling from other cells before applying to current
+                    document.querySelectorAll('#links-table-body .task-link').forEach(link => {
+                        link.classList.remove('font-bold', 'text-indigo-700'); // Assuming this was for task-link specific emphasis
+                    });
+                    // Apply any specific styling to the clicked task-link itself if needed (e.g. bold)
+                    // clickedTaskLink.classList.add('font-bold', 'text-indigo-700'); // Example
+
+                    targetRow.classList.add('bg-indigo-100'); // Highlight clicked row
+
+                    if (currentHighlightedNode === nodeId) { // Clicking same task link to deselect BFS
+                        console.log(`Deselecting BFS for node: ${nodeId}`);
+                        resetGraphFilter(); // Resets all highlights and redraws default graph
+                    } else { // Clicking new or different task link for BFS
+                        console.log(`Initiating BFS for node: ${nodeId}`);
+                        highlightNodeConnections(nodeId);
+                    }
+
 
                 } else if (clickedSwitchesValue) {
                     const sourceId = targetRow.getAttribute('data-source-id');
@@ -1312,73 +1325,65 @@
 
             });
 
-            function updateGraphForTableLinkHighlight() {
+            function updateGraphForTableLinkHighlight(clearOnly = false) {
                 if (!simulation || !simulation.nodes() || !g) {
-
                     console.warn("Simulation or graph group not ready for single link highlight/clear.");
-
                     return;
                 }
-                 // Ensure currentHighlightedNode (BFS highlight) is cleared
-                if (currentHighlightedNode) {
-                    // This case should ideally be handled before calling this function,
-                    // by calling resetGraphFilter which nullifies currentHighlightedNode.
-                    // But as a safeguard:
-                    console.warn("BFS highlight active while trying to highlight single link. Resetting BFS highlight first.");
-                    currentHighlightedNode = null; // Prevent BFS styling from interfering
-                    connectedNodes.clear();
-                    connectedLinks.clear();
-                     // We might need to call drawGraph() to fully reset visuals before applying single link highlight
-                    // For now, let's assume the caller (table click) handles this.
+
+                if (clearOnly || !highlightedLinkFromTable) {
+                    // Reset styles for all links and nodes to their default appearance
+                    g.selectAll('.link-group').each(function(d_link) {
+                        const line = d3.select(this).select('line');
+                        const text = d3.select(this).select('text');
+                        // Use currentlyDisplayedLinks for the scale, as it reflects the main graph's links
+                        const generalThicknessScale = createThicknessScale(currentlyDisplayedLinks || [], 0.8, 10);
+
+                        line.attr('stroke', '#999')
+                            .attr('stroke-opacity', 0.6)
+                            .attr('stroke-width', generalThicknessScale(d_link.weight));
+
+                        // Re-apply marker based on current graph direction state
+                        if (graphDirectionSelect.value === 'directed') {
+                            line.attr("marker-end", "url(#arrowhead)");
+                        } else {
+                            line.attr("marker-end", null);
+                        }
+                        text.style('display', 'none').style('font-weight', 'normal'); // Reset font weight
+                    });
+
+                    g.selectAll('.node').each(function(d_node) {
+                        const circle = d3.select(this).select('circle');
+                        const text = d3.select(this).select('text');
+
+                        circle.attr('fill', '#4f46e5') // Default node color
+                              .attr('r', 8) // Default radius
+                              .classed('node-highlighted', false)
+                              .classed('node-dimmed', false);
+                        text.style('display', 'none').classed('highlighted-node-text', false);
+                    });
+
+                    if (clearOnly) {
+                        highlightedLinkFromTable = null;
+                        // Table row highlight is managed by the caller or resetGraphFilter
+                    }
+                    return;
                 }
 
-
-
-                if (!highlightedLinkFromTable) { // Called to clear single-link-highlight styles
-                    // If called with no active single link highlight, revert affected elements to default.
-                    // This is typically called when a BFS highlight is initiated, or filter reset.
-                    // drawGraph() is the main function for establishing the complete default appearance.
-                    // This function should only revert elements it specifically changed.
-                    // However, since drawGraph() is called on reset, this path might be mostly for
-                    // when switching from single-link to BFS highlight without a full drawGraph().
-
-                    // If a full redraw is not happening (e.g. switching from single link to BFS),
-                    // then we need to ensure default styles are reapplied here.
-                    // The most robust way is to rely on drawGraph for full reset.
-                    // If this function is only for applying/removing its OWN effects,
-                    // then when highlightedLinkFromTable becomes null, the effects are 'removed'
-                    // by the next drawGraph or highlightNodeConnections applying their own styles.
-
-                    // For now, let's assume that if highlightedLinkFromTable is null,
-                    // either drawGraph() will be called (e.g. by resetGraphFilter) to reset everything,
-                    // or highlightNodeConnections() will apply its own comprehensive styling.
-                    // So, this function's primary job is to style for an active highlightedLinkFromTable.
-                    // The clearing of its specific styles when it becomes null is effectively achieved
-                    // by other functions taking over the styling.
-                    // If no other function takes over (e.g. just clearing the table selection), we might need
-                    // to explicitly call drawGraph() or have more comprehensive reset logic here.
-                    // Given current flow, resetGraphFilter calls drawGraph.
-                    // highlightNodeConnections re-styles everything for BFS.
-                    // So, this function can be simpler: only act if highlightedLinkFromTable is set.
-                    // The 'clearing' is handled by other functions setting their state.
-                    return; // No single link to highlight, so do nothing; expect other functions to define current view.
-                }
-
-                // If we reach here, highlightedLinkFromTable is set.
-                // Ensure currentHighlightedNode (BFS highlight) is not active, as they are mutually exclusive.
-                // This should be handled by the caller (e.g., table click listener calling resetGraphFilter first).
+                // If we reach here, highlightedLinkFromTable is set and clearOnly is false.
+                // Ensure currentHighlightedNode (BFS highlight) is cleared. This should ideally be done by the caller.
                 if (currentHighlightedNode) {
-                    console.warn("updateGraphForTableLinkHighlight called while currentHighlightedNode is active. This should be cleared by caller.");
-                    // To be safe, force clear BFS effects if not already handled by caller.
+                    console.warn("updateGraphForTableLinkHighlight (applying highlight) called while currentHighlightedNode is active. BFS highlight should be cleared by caller first.");
+                    // For safety, clearing BFS fixed positions if any. Styles will be overridden below.
+
                     simulation.nodes().forEach(n => { n.fx = null; n.fy = null; });
                     currentHighlightedNode = null;
                     connectedNodes.clear();
                     connectedLinks.clear();
+
                      // A full drawGraph() might be better here to reset all node/link states before applying single link highlight.
                     // For now, we assume the caller (table click listener) has called resetGraphFilter if needed.
                 }
-
-
 
                 const { sourceId, targetId, weight } = highlightedLinkFromTable;
 

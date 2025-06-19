@@ -7,7 +7,6 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom styles to complement Tailwind */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: #f8f9fa;
@@ -23,6 +22,7 @@
             height: 100vh;
             position: relative;
             cursor: move;
+            overflow: hidden;
         }
 
         svg {
@@ -50,23 +50,82 @@
         .arrowhead {
             fill: #999;
         }
+
+        .table-container {
+            max-height: 100vh;
+            overflow-y: auto;
+        }
+
+        .compact-table th, .compact-table td {
+            padding: 0.3rem 0.5rem;
+        }
+
+        .node-highlighted {
+            fill: #f59e0b !important;
+            r: 10 !important;
+            stroke: #b45309 !important;
+            stroke-width: 2px !important;
+        }
+
+        .node-dimmed {
+            fill: #d1d5db !important;
+            r: 5 !important;
+            opacity: 0.5 !important;
+        }
+
+        .link-highlighted {
+            stroke: #f59e0b !important;
+            stroke-width: 2px !important;
+            stroke-opacity: 0.8 !important;
+        }
+
+        .link-dimmed {
+            stroke: #e5e7eb !important;
+            stroke-width: 0.5px !important;
+            stroke-opacity: 0.3 !important;
+        }
+
+        .task-link {
+            cursor: pointer;
+            color: #4f46e5;
+            text-decoration: underline;
+        }
+
+        .task-link:hover {
+            color: #1e40af;
+        }
+
+        .filter-active {
+            background-color: #f3f4f6;
+        }
+
+        .highlighted-node-text {
+            display: block !important;
+            font-weight: bold !important;
+            fill: #b45309 !important;
+        }
+
+        .depth-level {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
 
     <div class="flex flex-col w-full p-4 md:p-6 lg:p-8 bg-gray-50">
-        <!-- Compact Control Bar -->
         <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">RTOS V2X Scheduler Trace Graph Visualizer</h1>
         <div class="metric-card p-3 mb-4">
              <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                 <!-- File Input -->
                  <div class="flex items-center">
                     <input type="file" id="fileInput" accept=".txt,.log" class="block w-full text-sm text-gray-500
                         file:mr-3 file:py-1.5 file:px-3
                         file:rounded-full file:border-0 file:text-sm file:font-semibold
-                        file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                        file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
                  </div>
-                 <!-- Metrics -->
                  <div class="flex items-center space-x-4 text-sm">
                     <div class="flex items-baseline space-x-1.5">
                         <span class="font-semibold text-gray-600">仅支持V2X调度轨迹数据格式
@@ -75,12 +134,13 @@
                         </span>
                     </div>
                  </div>
-                 <!-- Analyze Button -->
                  <button id="analyzeBtn" class="px-5 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75">Analyze</button>
+                 <button id="resetFilterBtn" class="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75">
+                    <i class="fa fa-refresh mr-1"></i>Reset Filter
+                 </button>
 
                  <div class="h-6 border-l border-gray-300 mx-2"></div>
 
-                 <!-- Metrics -->
                  <div class="flex items-center space-x-4 text-sm">
                     <div class="flex items-baseline space-x-1.5">
                         <span class="font-semibold text-gray-600">Nodes:</span>
@@ -94,93 +154,154 @@
                         <span class="font-semibold text-gray-600">Switches:</span>
                         <p id="total-switches" class="font-bold text-indigo-600">-</p>
                     </div>
+                    <div class="flex items-baseline space-x-1.5">
+                        <span class="font-semibold text-gray-600">当前显示:</span>
+                        <p id="current-nodes" class="font-bold text-green-600">-</p>
+                    </div>
+                    <div class="flex items-baseline space-x-1.5">
+                        <span class="font-semibold text-gray-600">当前边:</span>
+                        <p id="current-edges" class="font-bold text-green-600">-</p>
+                    </div>
                  </div>
 
                 <div class="h-6 border-l border-gray-300 mx-2"></div>
 
-                 <!-- Graph Controls -->
-                <div id="graph-controls" class="flex items-center space-x-2">
+                 <div id="graph-controls" class="flex flex-wrap items-center space-x-2">
                     <label for="weightThreshold" class="text-sm font-medium text-gray-700 whitespace-nowrap">最小调度次数:</label>
                     <input type="number" id="weightThreshold" value="1" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-
+                    
                     <label for="graphDirection" class="text-sm font-medium text-gray-700 whitespace-nowrap ml-2">Direct:</label>
                     <select id="graphDirection" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         <option value="undirected">无向图</option>
                         <option value="directed">有向图</option>
                     </select>
-
+                    
                     <label for="nodeSearch" class="text-sm font-medium text-gray-700 whitespace-nowrap ml-2">搜索节点:</label>
                     <input type="text" id="nodeSearch" placeholder="输入节点名称" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    
+                    <div class="flex items-center ml-2">
+                        <label for="bfsDepth" class="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">BFS深度:</label>
+                        <input type="range" id="bfsDepth" min="1" max="10" value="5" class="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="bfsDepthValue" class="ml-2 text-sm font-medium">5</span>
+                    </div>
+                    
+                    <div class="flex items-center ml-4">
+                        <span class="text-xs font-medium text-gray-600">颜色图例:</span>
+                        <div class="flex ml-2">
+                            <div class="flex items-center mr-3">
+                                <div class="depth-level bg-orange-400"></div>
+                                <span class="text-xs text-gray-600">源节点</span>
+                            </div>
+                            <div class="flex items-center mr-3">
+                                <div class="depth-level bg-yellow-400"></div>
+                                <span class="text-xs text-gray-600">1级节点</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="depth-level bg-green-400"></div>
+                                <span class="text-xs text-gray-600">2+级节点</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
              </div>
         </div>
 
-        <!-- Chart Section -->
-        <div class="metric-card flex-grow">
-            <div id="graph-container" class="relative">
-                 <div id="placeholder" class="text-center text-gray-500 flex items-center justify-center h-full">
-                    Please upload your trace data file to begin analysis.
-                 </div>
-                 <svg id="graph-svg"></svg>
-                 <div id="tooltip"></div>
+        <div class="flex flex-col lg:flex-row gap-4">
+            <div class="metric-card flex-grow lg:w-2/3">
+                <div id="graph-container" class="relative">
+                    <div id="placeholder" class="text-center text-gray-500 flex items-center justify-center h-full">
+                        Please upload your trace data file to begin analysis.
+                    </div>
+                    <svg id="graph-svg"></svg>
+                    <div id="tooltip"></div>
+                </div>
+            </div>
+
+            <div class="metric-card lg:w-1/4 table-container">
+                <h2 class="text-lg font-semibold text-gray-700 mb-2 text-center">Filtered Links Table</h2>
+                <div class="overflow-x-auto">
+                    <table id="links-table" class="w-full text-xs text-left text-gray-500 compact-table">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-3 py-2">Task A</th>
+                                <th scope="col" class="px-3 py-2">Task B</th>
+                                <th scope="col" class="px-3 py-2 text-right">Switches</th>
+                            </tr>
+                        </thead>
+                        <tbody id="links-table-body">
+                            <tr>
+                                <td colspan="3" class="px-3 py-2 text-center">Upload a file and adjust threshold to see data.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-
-        <!-- Table for Filtered Links -->
-        <div class="metric-card p-4 mt-4">
-            <h2 class="text-xl font-semibold text-gray-700 mb-3">Filtered Links Table</h2>
-            <div class="overflow-x-auto">
-                <table id="links-table" class="w-full text-sm text-left text-gray-500">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3">Node A</th>
-                            <th scope="col" class="px-6 py-3">Node B</th>
-                            <th scope="col" class="px-6 py-3">Switches</th>
-                        </tr>
-                    </thead>
-                    <tbody id="links-table-body">
-                        <!-- Rows will be inserted here by JavaScript -->
-                        <tr>
-                            <td colspan="3" class="px-6 py-4 text-center">Upload a file and adjust threshold to see data.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- DOM Element References ---
             const fileInput = document.getElementById('fileInput');
             const analyzeBtn = document.getElementById('analyzeBtn');
+            const resetFilterBtn = document.getElementById('resetFilterBtn');
             const weightThresholdInput = document.getElementById('weightThreshold');
             const graphDirectionSelect = document.getElementById('graphDirection');
             const nodeSearchInput = document.getElementById('nodeSearch');
+            const bfsDepthInput = document.getElementById('bfsDepth');
+            const bfsDepthValue = document.getElementById('bfsDepthValue');
             const tooltip = d3.select("#tooltip");
             const placeholder = document.getElementById('placeholder');
             const graphControls = document.getElementById('graph-controls');
+            const graphContainer = document.getElementById('graph-container');
 
-            // UI elements for summary data
             const totalNodesEl = document.getElementById('total-nodes');
             const totalEdgesEl = document.getElementById('total-edges');
             const totalSwitchesEl = document.getElementById('total-switches');
+            const currentNodesEl = document.getElementById('current-nodes');
+            const currentEdgesEl = document.getElementById('current-edges');
             const linksTableBody = document.getElementById('links-table-body');
 
-            // --- State Variables ---
             let fullGraphData = { nodes: [], links: [] };
-            let simulation; // To hold the D3 simulation
+            let undirectedGraphData = { nodes: [], links: [] };
+            let currentGraphData = { nodes: [], links: [] };
+            let simulation;
+            let currentHighlightedNode = null;
+            let connectedNodes = new Map();
+            let connectedLinks = new Set();
 
-            // --- Event Listeners ---
+            // 阻止图表容器的滚轮事件冒泡到页面
+            graphContainer.addEventListener('wheel', (e) => {
+                if (e.ctrlKey) {
+                    // 如果按住Ctrl键，允许默认缩放行为
+                    return;
+                }
+                // 否则阻止页面滚动
+                e.preventDefault();
+            }, { passive: false });
+
             analyzeBtn.addEventListener('click', handleAnalysis);
-            weightThresholdInput.addEventListener('input', () => drawGraph());
-            graphDirectionSelect.addEventListener('change', () => drawGraph());
-            nodeSearchInput.addEventListener('input', debounce(() => drawGraph(), 300));
+            resetFilterBtn.addEventListener('click', resetGraphFilter);
+            weightThresholdInput.addEventListener('input', () => {
+                console.log(`Weight threshold changed to: ${weightThresholdInput.value}`);
+                drawGraph();
+            });
+            graphDirectionSelect.addEventListener('change', () => {
+                console.log(`Graph direction changed to: ${graphDirectionSelect.value}`);
+                drawGraph();
+            });
+            nodeSearchInput.addEventListener('input', debounce(() => {
+                console.log(`Search term: ${nodeSearchInput.value}`);
+                drawGraph();
+            }, 300));
+            
+            bfsDepthInput.addEventListener('input', () => {
+                bfsDepthValue.textContent = bfsDepthInput.value;
+                console.log(`BFS depth changed to: ${bfsDepthInput.value}`);
+                if (currentHighlightedNode) {
+                    highlightNodeConnections(currentHighlightedNode);
+                }
+            });
 
-            /**
-             * Handles the file reading, parsing, and initial graph drawing.
-             */
             function handleAnalysis() {
                 const file = fileInput.files[0];
                 if (!file) {
@@ -192,22 +313,28 @@
                 placeholder.textContent = 'Analyzing...';
                 placeholder.style.display = 'flex';
                 document.getElementById('graph-svg').innerHTML = '';
-                linksTableBody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center">Analyzing...</td></tr>';
+                linksTableBody.innerHTML = '<tr><td colspan="3" class="px-3 py-2 text-center">Analyzing...</td></tr>';
 
-                if (simulation) simulation.stop(); // Stop any previous simulation
+                if (simulation) simulation.stop();
 
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const text = event.target.result;
                     fullGraphData = parseSchedData(text);
+                    console.log('Parsed full graph data:', fullGraphData);
                     if (fullGraphData.nodes.length > 0) {
+                        undirectedGraphData = buildUndirectedGraph(fullGraphData);
+                        currentGraphData = { ...fullGraphData };
+                        console.log('Built undirected graph data:', undirectedGraphData);
+                        
                         placeholder.style.display = 'none';
-
                         updateMetrics(fullGraphData);
+                        currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
+                        currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
                         drawGraph();
                     } else {
                         placeholder.textContent = 'Could not parse data from file. Please check the format.';
-                        linksTableBody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center">Could not parse data from file. Please check the format.</td></tr>';
+                        linksTableBody.innerHTML = '<tr><td colspan="3" class="px-3 py-2 text-center">Could not parse data from file. Please check the format.</td></tr>';
                     }
                 };
                 reader.onerror = (error) => {
@@ -217,9 +344,6 @@
                 reader.readAsText(file);
             }
 
-            /**
-             * Updates the metric cards with data from the analysis.
-             */
             function updateMetrics({nodes, links}) {
                 totalNodesEl.textContent = nodes.length.toLocaleString();
                 totalEdgesEl.textContent = links.length.toLocaleString();
@@ -227,12 +351,8 @@
                 totalSwitchesEl.textContent = totalSwitches.toLocaleString();
             }
 
-            /**
-             * Parses the raw scheduler trace data from the text file.
-             */
             function parseSchedData(text) {
-                const lines = text.split('
-');
+                const lines = text.split('\n');
                 const nodeMap = new Map();
                 const linkMap = new Map();
                 const regex = /prev_comm=([\S]+)\s+prev_pid=\d+\s+prev_tid=([\S]+)[\s\S]*?==>\s+next_comm=([\S]+)\s+next_tid=([\S]+)/;
@@ -249,7 +369,6 @@
                         if (!nodeMap.has(sourceId)) nodeMap.set(sourceId, { id: sourceId, comm: prev_comm, pid: prev_tid });
                         if (!nodeMap.has(targetId)) nodeMap.set(targetId, { id: targetId, comm: next_comm, pid: next_tid });
 
-                        // 有向图边的键是有序的
                         const linkKey = `${sourceId}->${targetId}`;
 
                         if (linkMap.has(linkKey)) {
@@ -264,88 +383,173 @@
                     }
                 }
 
+                console.log(`Parsed ${nodeMap.size} nodes and ${linkMap.size} links`);
                 return {
                     nodes: Array.from(nodeMap.values()),
                     links: Array.from(linkMap.values())
                 };
             }
 
-            /**
-             * Draws or updates the graph based on the current settings.
-             */
+            function buildUndirectedGraph({nodes, links}) {
+                const undirectedLinkMap = new Map();
+                
+                links.forEach(link => {
+                    const nodeIds = [link.source, link.target].sort();
+                    const undirectedKey = `${nodeIds[0]}->${nodeIds[1]}`;
+                    
+                    if (undirectedLinkMap.has(undirectedKey)) {
+                        undirectedLinkMap.get(undirectedKey).weight += link.weight;
+                    } else {
+                        undirectedLinkMap.set(undirectedKey, {
+                            source: nodeIds[0],
+                            target: nodeIds[1],
+                            weight: link.weight,
+                            originalLinks: [link]
+                        });
+                    }
+                });
+                
+                console.log(`Built undirected graph with ${nodes.length} nodes and ${undirectedLinkMap.size} links`);
+                return {
+                    nodes: [...nodes],
+                    links: Array.from(undirectedLinkMap.values())
+                };
+            }
+
             function drawGraph() {
-                if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) return;
+                console.log('Drawing graph with current settings...');
+                if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) {
+                    console.log('No graph data available');
+                    return;
+                }
 
                 const threshold = +weightThresholdInput.value;
                 const isDirected = graphDirectionSelect.value === 'directed';
                 const searchTerm = nodeSearchInput.value.trim().toLowerCase();
-
-                let { nodes, links } = fullGraphData;
-
-                // 节点搜索过滤
+                
+                console.log(`Threshold: ${threshold}, Directed: ${isDirected}, Search: ${searchTerm || 'none'}`);
+                
+                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
+                
+                let { nodes, links } = baseGraphData;
+                
+                console.log(`Starting with ${nodes.length} nodes and ${links.length} links`);
+                
                 if (searchTerm) {
-                    const matchedNodes = nodes.filter(node =>
-                        node.id.toLowerCase().includes(searchTerm) ||
-                        (node.comm && node.comm.toLowerCase().includes(searchTerm)) ||
-                        (node.pid && node.pid.toLowerCase().includes(searchTerm))
-                    );
-
-                    const matchedNodeIds = new Set(matchedNodes.map(node => node.id));
-
-                    // 过滤包含至少一个匹配节点的边
-                    links = links.filter(link =>
-                        matchedNodeIds.has(link.source) || matchedNodeIds.has(link.target)
-                    );
-
-                    // 确保只包含在过滤边中的节点
-                    const nodesInLinks = new Set([
-                        ...links.map(link => link.source),
-                        ...links.map(link => link.target)
-                    ]);
-
-                    nodes = nodes.filter(node => nodesInLinks.has(node.id));
+                    const matchedNodes = nodes.filter(node => {
+                        const match = node.id.toLowerCase().includes(searchTerm) || 
+                            (node.comm && node.comm.toLowerCase().includes(searchTerm)) ||
+                            (node.pid && node.pid.toLowerCase().includes(searchTerm));
+                        console.log(`Node ${node.id}: ${match ? 'MATCH' : 'NO MATCH'}`);
+                        return match;
+                    });
+                    
+                    console.log(`Found ${matchedNodes.length} matched nodes`);
+                    
+                    if (matchedNodes.length === 0) {
+                        console.log('No nodes matched search term');
+                        nodes = [];
+                        links = [];
+                    } else {
+                        const matchedNodeIds = new Set(matchedNodes.map(node => node.id));
+                        
+                        links = links.filter(link => {
+                            const match = matchedNodeIds.has(link.source) || matchedNodeIds.has(link.target);
+                            console.log(`Link ${link.source} -> ${link.target}: ${match ? 'MATCH' : 'NO MATCH'}`);
+                            return match;
+                        });
+                        
+                        const nodesInLinks = new Set([
+                            ...links.map(link => link.source),
+                            ...links.map(link => link.target)
+                        ]);
+                        
+                        nodes = nodes.filter(node => nodesInLinks.has(node.id));
+                        
+                        console.log(`Filtered to ${nodes.length} nodes and ${links.length} links after search`);
+                    }
                 }
 
-                // 按权重降序排序
                 const filteredLinks = links
-                    .filter(link => link.weight >= threshold)
+                    .filter(link => {
+                        const match = link.weight >= threshold;
+                        console.log(`Link ${link.source} -> ${link.target} (weight ${link.weight}): ${match ? 'PASS' : 'FILTERED'}`);
+                        return match;
+                    })
                     .sort((a, b) => b.weight - a.weight);
+
+                console.log(`After weight threshold filter: ${filteredLinks.length} links`);
+                
+                // 调试输出过滤后的边数据
+                console.log('Filtered links:', filteredLinks);
+
+                const fullNodeLookup = new Map();
+                fullGraphData.nodes.forEach(node => {
+                    fullNodeLookup.set(node.id, {
+                        id: node.id,
+                        comm: node.comm || node.id.split('/')[0],
+                        pid: node.pid || node.id.split('/')[1]
+                    });
+                });
+
+                console.log(`Full node lookup created with ${fullNodeLookup.size} entries`);
 
                 // 更新表格
                 linksTableBody.innerHTML = '';
 
                 if (filteredLinks.length === 0) {
+                    console.log('No links to display in table');
                     const row = linksTableBody.insertRow();
                     const cell = row.insertCell();
                     cell.colSpan = 3;
                     cell.textContent = 'No links meet the current threshold.';
-                    cell.className = 'px-6 py-4 text-center';
+                    cell.className = 'px-3 py-2 text-center';
                 } else {
-                    // 创建完整节点映射，包含所有原始节点
-                    const fullNodeLookup = new Map(fullGraphData.nodes.map(node => [node.id, node]));
-
+                    console.log(`Populating table with ${filteredLinks.length} links`);
                     filteredLinks.forEach(link => {
+                        // 确保link.source和link.target是字符串ID
+                        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                        
+                        const sourceNode = fullNodeLookup.get(sourceId);
+                        const targetNode = fullNodeLookup.get(targetId);
+                        
+                        console.log(`Table row: ${sourceId} (${sourceNode ? sourceNode.comm : 'unknown'}) -> ${targetId} (${targetNode ? targetNode.comm : 'unknown'})`);
+                        
+                        // 额外调试：如果节点未找到，输出更多信息
+                        if (!sourceNode) {
+                            console.warn(`Source node not found for ID: ${sourceId}`, link);
+                        }
+                        if (!targetNode) {
+                            console.warn(`Target node not found for ID: ${targetId}`, link);
+                        }
+
                         const row = linksTableBody.insertRow();
                         row.className = 'bg-white border-b hover:bg-gray-50 transition-colors';
 
                         const cellNodeA = row.insertCell();
-                        // 从完整节点映射中获取节点信息
-                        const sourceNode = fullNodeLookup.get(link.source);
-                        cellNodeA.textContent = sourceNode ? `${sourceNode.comm}/${sourceNode.pid}` : link.source;
-                        cellNodeA.className = 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap';
+                        cellNodeA.innerHTML = sourceNode ? `<span class="task-link" data-node-id="${sourceId}">${sourceNode.comm}/${sourceNode.pid}</span>` : sourceId;
+                        cellNodeA.className = 'px-3 py-2 font-medium text-gray-900 whitespace-nowrap';
 
                         const cellNodeB = row.insertCell();
-                        // 从完整节点映射中获取节点信息
-                        const targetNode = fullNodeLookup.get(link.target);
-                        cellNodeB.textContent = targetNode ? `${targetNode.comm}/${targetNode.pid}` : link.target;
-                        cellNodeB.className = 'px-6 py-4';
+                        cellNodeB.innerHTML = targetNode ? `<span class="task-link" data-node-id="${targetId}">${targetNode.comm}/${targetNode.pid}</span>` : targetId;
+                        cellNodeB.className = 'px-3 py-2';
 
                         const cellSwitches = row.insertCell();
                         cellSwitches.textContent = link.weight;
-                        cellSwitches.className = 'px-6 py-4 font-semibold text-indigo-600';
+                        cellSwitches.className = 'px-3 py-2 font-semibold text-indigo-600 text-right';
+                    });
+
+                    // 为任务链接添加点击事件
+                    document.querySelectorAll('.task-link').forEach(link => {
+                        link.addEventListener('click', (e) => {
+                            const nodeId = e.currentTarget.getAttribute('data-node-id');
+                            highlightNodeConnections(nodeId);
+                        });
                     });
                 }
 
+                // 图形渲染代码
                 const container = document.getElementById('graph-container');
                 const svg = d3.select("#graph-svg");
 
@@ -356,7 +560,6 @@
 
                 const g = svg.append("g");
 
-                // 定义箭头标记（仅用于有向图）
                 if (isDirected) {
                     svg.append("defs").append("marker")
                         .attr("id", "arrowhead")
@@ -371,18 +574,23 @@
                         .attr("class", "arrowhead");
                 }
 
-                // --- D3 Simulation Setup ---
+                // 确保links数据格式正确
+                const formattedLinks = filteredLinks.map(link => ({
+                    ...link,
+                    source: typeof link.source === 'object' ? link.source.id : link.source,
+                    target: typeof link.target === 'object' ? link.target.id : link.target
+                }));
+
                 simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(filteredLinks).id(d => d.id)
-                        .strength(d => 0.1 * Math.sqrt(d.weight / (d3.max(filteredLinks, l => l.weight) || 1))))
+                    .force("link", d3.forceLink(formattedLinks).id(d => d.id)
+                        .strength(d => 0.1 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))))
                     .force("charge", d3.forceManyBody().strength(-400))
                     .force("center", d3.forceCenter(width / 2, height / 2))
                     .force("collide", d3.forceCollide().radius(15));
 
-                // --- Draw Links ---
                 const linkGroup = g.append("g")
                     .selectAll("g")
-                    .data(filteredLinks)
+                    .data(formattedLinks)
                     .join("g")
                     .attr("class", "link-group");
 
@@ -390,8 +598,7 @@
                     .attr("stroke", "#999")
                     .attr("stroke-opacity", 0.6)
                     .attr("stroke-width", d => Math.min(Math.sqrt(d.weight), 8) * 0.5 + 0.5);
-
-                // 仅为有向图添加箭头
+                
                 if (isDirected) {
                     linkLine.attr("marker-end", "url(#arrowhead)");
                 }
@@ -421,7 +628,6 @@
                         tooltip.style("opacity", 0);
                     });
 
-                // --- Draw Nodes ---
                 const nodeGroup = g.append("g")
                     .selectAll("g")
                     .data(nodes)
@@ -455,9 +661,11 @@
                     .on("mouseout", function() {
                         d3.select(this).select('text').style('display', 'none');
                         tooltip.style("opacity", 0);
+                    })
+                    .on("click", function(event, d) {
+                        highlightNodeConnections(d.id);
                     });
 
-                // --- Drag and Zoom Handlers ---
                 const drag = d3.drag()
                     .on("start", (event, d) => {
                         if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -484,7 +692,6 @@
 
                 svg.call(zoom);
 
-                // --- Simulation Ticker ---
                 simulation.on("tick", () => {
                     linkGroup.select("line")
                         .attr("x1", d => d.source.x)
@@ -498,11 +705,157 @@
 
                     nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
                 });
+                
+                console.log('Graph drawing completed');
+                
+                // 如果有当前高亮节点，重新应用高亮
+                if (currentHighlightedNode) {
+                    highlightNodeConnections(currentHighlightedNode);
+                }
             }
 
-            /**
-             * 防抖函数，限制函数调用频率
-             */
+            function highlightNodeConnections(nodeId) {
+                console.log(`Highlighting connections for node: ${nodeId} with BFS depth: ${bfsDepthInput.value}`);
+                
+                // 重置之前的高亮状态
+                d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
+                d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
+                d3.selectAll('.node text').classed('highlighted-node-text', false);
+                
+                // 如果点击同一个节点，取消高亮
+                if (currentHighlightedNode === nodeId) {
+                    currentHighlightedNode = null;
+                    connectedNodes.clear();
+                    connectedLinks.clear();
+                    document.querySelectorAll('.task-link').forEach(link => {
+                        link.classList.remove('font-bold', 'text-indigo-700');
+                    });
+                    currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
+                    currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
+                    return;
+                }
+                
+                currentHighlightedNode = nodeId;
+                connectedNodes.clear();
+                connectedLinks.clear();
+                
+                // 使用广度优先搜索找到所有连通的节点
+                const isDirected = graphDirectionSelect.value === 'directed';
+                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
+                const maxDepth = +bfsDepthInput.value;
+                
+                // BFS初始化
+                const queue = [{id: nodeId, depth: 0}];
+                connectedNodes.set(nodeId, 0);
+                
+                // 执行BFS
+                while (queue.length > 0) {
+                    const {id, depth} = queue.shift();
+                    
+                    // 如果达到最大深度，不再继续扩展
+                    if (depth >= maxDepth) continue;
+                    
+                    // 查找与当前节点相连的所有节点
+                    baseGraphData.links.forEach(link => {
+                        if (link.source === id) {
+                            const neighborId = link.target;
+                            if (!connectedNodes.has(neighborId)) {
+                                connectedNodes.set(neighborId, depth + 1);
+                                connectedLinks.add(`${link.source}-${link.target}`);
+                                queue.push({id: neighborId, depth: depth + 1});
+                            } else {
+                                connectedLinks.add(`${link.source}-${link.target}`);
+                            }
+                        } else if (link.target === id) {
+                            const neighborId = link.source;
+                            if (!connectedNodes.has(neighborId)) {
+                                connectedNodes.set(neighborId, depth + 1);
+                                connectedLinks.add(`${link.source}-${link.target}`);
+                                queue.push({id: neighborId, depth: depth + 1});
+                            } else {
+                                connectedLinks.add(`${link.source}-${link.target}`);
+                            }
+                        }
+                    });
+                }
+                
+                console.log(`Found ${connectedNodes.size} connected nodes with depth limit ${maxDepth}`);
+                
+                // 更新节点样式
+                d3.selectAll('.node circle').each(function(d) {
+                    if (connectedNodes.has(d.id)) {
+                        const depth = connectedNodes.get(d.id);
+                        let fillColor;
+                        
+                        // 根据深度设置不同的颜色
+                        if (depth === 0) {
+                            fillColor = '#f59e0b'; // 源节点
+                        } else if (depth === 1) {
+                            fillColor = '#eab308'; // 一级节点
+                        } else {
+                            fillColor = '#22c55e'; // 二级及以上节点
+                        }
+                        
+                        d3.select(this)
+                            .attr('fill', fillColor)
+                            .classed('node-highlighted', true)
+                            .classed('node-dimmed', false);
+                            
+                        // 显示高亮节点的文本
+                        d3.select(this.parentNode).select('text')
+                            .classed('highlighted-node-text', true);
+                    } else {
+                        d3.select(this).classed('node-highlighted', false).classed('node-dimmed', true);
+                    }
+                });
+                
+                // 更新边样式
+                d3.selectAll('.link-group line').each(function(d) {
+                    const linkKey = `${d.source.id}-${d.target.id}`;
+                    if (connectedLinks.has(linkKey) || connectedLinks.has(`${d.target.id}-${d.source.id}`)) {
+                        d3.select(this).classed('link-highlighted', true).classed('link-dimmed', false);
+                    } else {
+                        d3.select(this).classed('link-highlighted', false).classed('link-dimmed', true);
+                    }
+                });
+                
+                // 更新表格中的高亮
+                document.querySelectorAll('.task-link').forEach(link => {
+                    if (link.getAttribute('data-node-id') === nodeId) {
+                        link.classList.add('font-bold', 'text-indigo-700');
+                    } else {
+                        link.classList.remove('font-bold', 'text-indigo-700');
+                    }
+                });
+                
+                // 更新当前显示的节点数和边数
+                currentNodesEl.textContent = connectedNodes.size.toLocaleString();
+                currentEdgesEl.textContent = connectedLinks.size.toLocaleString();
+            }
+
+            function resetGraphFilter() {
+                console.log('Resetting graph filter');
+                
+                // 重置高亮状态
+                d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
+                d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
+                d3.selectAll('.node text').classed('highlighted-node-text', false);
+                
+                // 重置表格中的高亮
+                document.querySelectorAll('.task-link').forEach(link => {
+                    link.classList.remove('font-bold', 'text-indigo-700');
+                });
+                
+                // 重置当前高亮节点
+                currentHighlightedNode = null;
+                connectedNodes.clear();
+                connectedLinks.clear();
+                
+                // 重置当前显示的节点数
+                currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
+                currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
+            }
+
             function debounce(func, delay) {
                 let timeout;
                 return function() {
@@ -514,6 +867,5 @@
             }
         });
     </script>
-
 </body>
-</html>
+</html>    

@@ -134,21 +134,23 @@
                         </span>
                     </div>
                  </div>
-                 <button id="analyzeBtn" class="px-5 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75">Analyze</button>
                  <div class="h-6 border-l border-gray-300 mx-2"></div>
 
                  <div class="flex items-center space-x-4 text-sm">
                     <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">Nodes (<span id="displayed-nodes-count">-</span>):</span>
-                        <p id="total-nodes" class="font-bold text-indigo-600">-</p>
+                        <span class="font-semibold text-gray-600">Nodes:</span>
+                        <span id="total-nodes-val" class="font-bold text-indigo-600">-</span>
+                        <span class="text-gray-500">(<span id="filtered-nodes-val" class="font-bold text-green-600">-</span>)</span>
                     </div>
                     <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">Edges (<span id="displayed-edges-count">-</span>):</span>
-                        <p id="total-edges" class="font-bold text-indigo-600">-</p>
+                        <span class="font-semibold text-gray-600">Edges:</span>
+                        <span id="total-edges-val" class="font-bold text-indigo-600">-</span>
+                        <span class="text-gray-500">(<span id="filtered-edges-val" class="font-bold text-green-600">-</span>)</span>
                     </div>
                      <div class="flex items-baseline space-x-1.5">
                         <span class="font-semibold text-gray-600">Switches:</span>
-                        <p id="total-switches" class="font-bold text-indigo-600">-</p>
+                        <span id="total-switches-val" class="font-bold text-indigo-600">-</span>
+                        <span class="text-gray-500">(<span id="filtered-switches-val" class="font-bold text-green-600">-</span>)</span>
                     </div>
                  </div>
 
@@ -165,42 +167,7 @@
                     <span class="text-gray-400 mx-1">|</span>
                     
                     <input type="text" id="nodeSearch" placeholder="搜索任务名" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ml-2">
-                    <span class="text-gray-400 mx-1">|</span>
-                    
-                    <div class="flex items-center ml-2">
-                        <label for="bfsDepthSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">BFS深度:</label>
-                        <select id="bfsDepthSelect" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5" selected>5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
-                            <option value="10">10</option>
-                        </select>
-                    </div>
-                    <span class="text-gray-400 mx-1">|</span>
-                    
-                    <div class="flex items-center ml-2">
-                        <span class="text-xs font-medium text-gray-600">颜色图例:</span>
-                        <div class="flex ml-2">
-                            <div class="flex items-center mr-3">
-                                <div class="depth-level bg-orange-400"></div>
-                                <span class="text-xs text-gray-600">源节点</span>
-                            </div>
-                            <div class="flex items-center mr-3">
-                                <div class="depth-level bg-yellow-400"></div>
-                                <span class="text-xs text-gray-600">1级节点</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="depth-level bg-green-400"></div>
-                                <span class="text-xs text-gray-600">2+级节点</span>
-                            </div>
-                        </div>
-                    </div>
+                    {/* BFS Depth and Color Legend moved to the right-hand card */}
                 </div>
              </div>
         </div>
@@ -216,12 +183,44 @@
                 </div>
             </div>
 
-            <div class="metric-card lg:w-1/4 table-container">
-                <div class="flex justify-between items-center mb-2">
-                    <h2 class="text-lg font-semibold text-gray-700 text-center">Filtered Links Table</h2>
+            <div class="metric-card lg:w-1/4 table-container p-3"> {/* Added padding to the card */}
+                <div class="flex justify-end items-center mb-2"> {/* Changed justify-between to justify-end since title is gone */}
+                    {/* Title removed */}
                     <button id="resetFilterBtn" class="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75">
                        <i class="fa fa-refresh mr-1"></i>Reset Filter
                     </button>
+                </div>
+                <div class="flex flex-col space-y-3 mb-3 mt-3 border-t pt-3"> {/* Wrapper for the moved controls, added mt-3, border-t, pt-3 for separation */}
+                    <div class="flex items-center">
+                        <label for="bfsDepthSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">BFS深度:</label>
+                        <select id="bfsDepthSelect" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm w-full"> {/* Made select full width */}
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5" selected>5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col space-y-1"> {/* Changed to flex-col for legend items stacking */}
+                        <span class="text-xs font-medium text-gray-600">颜色图例:</span>
+                        <div class="flex items-center">
+                            <div class="depth-level bg-orange-400"></div>
+                            <span class="text-xs text-gray-600">源节点</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="depth-level bg-yellow-400"></div>
+                            <span class="text-xs text-gray-600">1级节点</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="depth-level bg-green-400"></div>
+                            <span class="text-xs text-gray-600">2+级节点</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table id="links-table" class="w-full text-xs text-left text-gray-500 compact-table">
@@ -246,7 +245,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const fileInput = document.getElementById('fileInput');
-            const analyzeBtn = document.getElementById('analyzeBtn');
+            // const analyzeBtn = document.getElementById('analyzeBtn'); // Removed
             const resetFilterBtn = document.getElementById('resetFilterBtn');
             const weightThresholdInput = document.getElementById('weightThreshold');
             const graphDirectionSelect = document.getElementById('graphDirection');
@@ -257,11 +256,14 @@
             const graphControls = document.getElementById('graph-controls');
             const graphContainer = document.getElementById('graph-container');
 
-            const totalNodesEl = document.getElementById('total-nodes');
-            const totalEdgesEl = document.getElementById('total-edges');
-            const totalSwitchesEl = document.getElementById('total-switches');
-            const displayedNodesCountEl = document.getElementById('displayed-nodes-count'); // New
-            const displayedEdgesCountEl = document.getElementById('displayed-edges-count'); // New
+            // Updated selectors for new count display format
+            const totalNodesValEl = document.getElementById('total-nodes-val');
+            const filteredNodesValEl = document.getElementById('filtered-nodes-val');
+            const totalEdgesValEl = document.getElementById('total-edges-val');
+            const filteredEdgesValEl = document.getElementById('filtered-edges-val');
+            const totalSwitchesValEl = document.getElementById('total-switches-val');
+            const filteredSwitchesValEl = document.getElementById('filtered-switches-val');
+
             const linksTableBody = document.getElementById('links-table-body');
 
             let fullGraphData = { nodes: [], links: [] };
@@ -286,7 +288,8 @@
                 e.preventDefault();
             }, { passive: false });
 
-            analyzeBtn.addEventListener('click', handleAnalysis);
+            // analyzeBtn.addEventListener('click', handleAnalysis); // Removed
+            fileInput.addEventListener('change', handleAnalysis); // Auto-analyze on file change
             resetFilterBtn.addEventListener('click', resetGraphFilter);
             weightThresholdInput.addEventListener('input', () => {
                 console.log(`Weight threshold changed to: ${weightThresholdInput.value}`);
@@ -349,11 +352,16 @@
                 reader.readAsText(file);
             }
 
-            function updateMetrics({nodes, links}) {
-                totalNodesEl.textContent = nodes.length.toLocaleString();
-                totalEdgesEl.textContent = links.length.toLocaleString();
-                const totalSwitches = links.reduce((sum, link) => sum + link.weight, 0);
-                totalSwitchesEl.textContent = totalSwitches.toLocaleString();
+            function updateMetrics({nodes, links}) { // This function now sets the "Total" values
+                totalNodesValEl.textContent = nodes.length.toLocaleString();
+                totalEdgesValEl.textContent = links.length.toLocaleString();
+                const totalSwitchesCount = links.reduce((sum, link) => sum + link.weight, 0);
+                totalSwitchesValEl.textContent = totalSwitchesCount.toLocaleString();
+
+                // Initialize filtered counts to dash or 0 when new file is loaded, before first drawGraph
+                filteredNodesValEl.textContent = '-';
+                filteredEdgesValEl.textContent = '-';
+                filteredSwitchesValEl.textContent = '-';
             }
 
             function parseSchedData(text) {
@@ -562,8 +570,10 @@
 
                 // Update displayed node and edge counts based on the data *before* simulation
                 // These are the nodes and links that will be attempted to be rendered.
-                displayedNodesCountEl.textContent = nodes.length.toLocaleString();
-                displayedEdgesCountEl.textContent = filteredLinks.length.toLocaleString();
+                filteredNodesValEl.textContent = nodes.length.toLocaleString();
+                filteredEdgesValEl.textContent = filteredLinks.length.toLocaleString();
+                const filteredSwitchesCount = filteredLinks.reduce((sum, link) => sum + link.weight, 0);
+                filteredSwitchesValEl.textContent = filteredSwitchesCount.toLocaleString();
 
                 // Cache the exact nodes and links being rendered for BFS in highlightNodeConnections
                 currentlyDisplayedNodes = [...nodes]; // Store a copy
@@ -889,9 +899,32 @@
                     }
                 });
                 
-                // 更新当前显示的节点数和边数
-                displayedNodesCountEl.textContent = connectedNodes.size.toLocaleString();
-                displayedEdgesCountEl.textContent = connectedLinks.size.toLocaleString();
+                // 更新当前显示的节点数和边数 (Filtered values)
+                filteredNodesValEl.textContent = connectedNodes.size.toLocaleString();
+                filteredEdgesValEl.textContent = connectedLinks.size.toLocaleString();
+                // For switches, sum the weights of the connectedLinks
+                let highlightedSwitchesCount = 0;
+                const allLinksForWeightLookup = currentlyDisplayedLinks; // Or merge fullGraphData.links if original weights needed and not on currentlyDisplayedLinks
+                connectedLinks.forEach(linkKey => {
+                    // linkKey is sourceId-targetId. Need to find the link object to get its weight.
+                    // This is a bit inefficient if linksForBfs is large.
+                    // Consider if connectedLinks should store link objects or if weights need to be summed differently.
+                    // For now, assuming linkKey is sufficient if currentlyDisplayedLinks contains these keys.
+                    const parts = linkKey.split('-');
+                    const sourceId = parts[0]; // This assumes no hyphens in IDs themselves
+                    const targetId = parts.slice(1).join('-'); // To handle hyphens in target ID
+
+                    const actualLink = allLinksForWeightLookup.find(l =>
+                        ((typeof l.source === 'object' ? l.source.id : l.source) === sourceId &&
+                         (typeof l.target === 'object' ? l.target.id : l.target) === targetId) ||
+                        (!isDirected && (typeof l.source === 'object' ? l.source.id : l.source) === targetId &&
+                         (typeof l.target === 'object' ? l.target.id : l.target) === sourceId) // check reverse for undirected
+                    );
+                    if (actualLink) {
+                        highlightedSwitchesCount += actualLink.weight;
+                    }
+                });
+                filteredSwitchesValEl.textContent = highlightedSwitchesCount.toLocaleString();
             }
 
             function resetGraphFilter() {

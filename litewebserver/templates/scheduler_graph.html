@@ -932,7 +932,13 @@
                             const neighborInDisplayed = nodesForBfs.find(n => n.id === neighborId);
                             if (!neighborInDisplayed) return; // Skip if neighbor isn't currently visible
 
-                            const linkKey = `${linkSourceId}->${linkTargetId}`; // Standardized key with '->'
+                            let linkKey;
+                            if (isDirected) {
+                                linkKey = `${currentId}-${neighborId}`;
+                            } else {
+                                const ids = [currentId, neighborId].sort();
+                                linkKey = `${ids[0]}-${ids[1]}`;
+                            }
 
                             if (!connectedNodes.has(neighborId) || connectedNodes.get(neighborId) > currentDepth + 1) {
                                 connectedNodes.set(neighborId, currentDepth + 1);
@@ -941,12 +947,17 @@
                             } else if (connectedNodes.has(neighborId) && (connectedNodes.get(neighborId) === currentDepth + 1 || currentDepth < connectedNodes.get(neighborId))) {
                                 // If already visited but this path is shorter or same (for multi-path to same node within depth)
                                 // ensure link is added if it's part of *any* valid path to a connected node
-                                connectedLinks.add(linkKey);
+                                connectedLinks.add(linkKey); // Add the same canonical key
                             }
                         }
                     });
                 }
-                console.log(`BFS from ${nodeId} (depth ${maxDepth}) found ${connectedNodes.size} nodes and ${connectedLinks.size} links within the currently displayed graph.`);
+                const finalConnectedLinksArray = Array.from(connectedLinks);
+                console.log(`BFS from ${nodeId} (depth ${maxDepth}) found ${connectedNodes.size} nodes (${Array.from(connectedNodes.keys()).slice(0,3).join(',')},...) and ${finalConnectedLinksArray.length} unique links (${finalConnectedLinksArray.slice(0,3).join(',')},...).`);
+                if (connectedNodes.size > 0) {
+                    const sampleNodes = Array.from(connectedNodes.keys()).slice(0, 5);
+                    console.log(`LOGGING: Sample of connectedNode IDs: ${sampleNodes.join(', ')} (${connectedNodes.size} total)`);
+                }
 
                 // Clear fx, fy for all nodes before applying new hierarchical layout
                 // This ensures nodes not in the current selection are released
@@ -1001,8 +1012,12 @@
 
 
                 // Update node visual styles (colors, sizes)
+                let nodeLogCounter = 0;
+                const maxNodeLogs = 5;
                 d3.selectAll('.node circle').each(function(d_node) { // d_node is the datum from D3
                     const isConnected = connectedNodes.has(d_node.id);
+                    let logThisNode = nodeLogCounter < maxNodeLogs || d_node.id === nodeId; // Log first few and always the start node
+
                     if (isConnected) {
                         const depth = connectedNodes.get(d_node.id);
                         let fillColor;
@@ -1010,16 +1025,20 @@
                         else if (depth === 1) fillColor = '#eab308'; // Level 1
                         else fillColor = '#22c55e'; // Level 2+
                         
+                        if (logThisNode) console.log(`LOGGING: Node ${d_node.id} IS CONNECTED (depth ${depth}). Applying highlight styles.`);
+
                         d3.select(this)
                             .attr('fill', fillColor)
                             .classed('node-highlighted', true)
                             .classed('node-dimmed', false);
                         d3.select(this.parentNode).select('text').classed('highlighted-node-text', true);
                     } else {
+                        if (logThisNode) console.log(`LOGGING: Node ${d_node.id} is NOT connected. Applying .node-dimmed.`);
                         // For nodes not in connectedNodes, ensure they are dimmed and fx/fy are cleared (done above)
                         d3.select(this).classed('node-highlighted', false).classed('node-dimmed', true);
                          d3.select(this.parentNode).select('text').classed('highlighted-node-text', false);
                     }
+                    if (logThisNode) nodeLogCounter++;
                 });
                 
                 // Update link visual styles
@@ -1029,27 +1048,40 @@
                                          document.msFullscreenElement === graphContainer;
 
                 let highlightedLinkObjects = [];
-                if (connectedLinks.size > 0) { // connectedLinks stores keys like "sourceId-targetId" from BFS
-                    linksForBfs.forEach(linkFromDisplayed => { // linksForBfs is currentlyDisplayedLinks
-                        const sourceIdStr = (typeof linkFromDisplayed.source === 'object') ? linkFromDisplayed.source.id : linkFromDisplayed.source;
-                        const targetIdStr = (typeof linkFromDisplayed.target === 'object') ? linkFromDisplayed.target.id : linkFromDisplayed.target;
+                if (connectedLinks.size > 0 && linksForBfs) {
+                    linksForBfs.forEach(linkFromDisplayed => {
+                        const sId = (typeof linkFromDisplayed.source === 'object') ? linkFromDisplayed.source.id : linkFromDisplayed.source;
+                        const tId = (typeof linkFromDisplayed.target === 'object') ? linkFromDisplayed.target.id : linkFromDisplayed.target;
 
-                        // Check if this link (or its reverse for undirected) was found in BFS path
-                        if (connectedLinks.has(`${sourceIdStr}-${targetIdStr}`) ||
-                            (!isDirected && connectedLinks.has(`${targetIdStr}-${sourceIdStr}`))) {
-                             highlightedLinkObjects.push(linkFromDisplayed);
+                        let queryKey;
+                        if (isDirected) {
+                            queryKey = `${sId}-${tId}`;
+                        } else {
+                            const ids = [sId, tId].sort();
+                            queryKey = `${ids[0]}-${ids[1]}`;
+                        }
+
+                        if (connectedLinks.has(queryKey)) {
+                            highlightedLinkObjects.push(linkFromDisplayed);
                         }
                     });
                 }
+                if (connectedLinks.size > 0) { // Add log even if linksForBfs might be empty
+                    console.log(`LOGGING: Built highlightedLinkObjects with ${highlightedLinkObjects.length} links based on ${connectedLinks.size} keys in connectedLinks.`);
+                }
+
 
                 // Create a thickness scale for the highlighted links.
                 // This will now apply regardless of fullscreen mode.
                 // Using a range like [1.5, 10] to make highlighted links generally a bit thicker.
                 const highlightedThicknessScale = createThicknessScale(highlightedLinkObjects, 1.5, 10);
 
+                let linkLogCounter = 0;
+                const maxLinkLogs = 5;
                 d3.selectAll('.link-group line').each(function(d_link_datum) {
                     const sourceId = (typeof d_link_datum.source === 'object') ? d_link_datum.source.id : d_link_datum.source;
                     const targetId = (typeof d_link_datum.target === 'object') ? d_link_datum.target.id : d_link_datum.target;
+                    let logThisLink = linkLogCounter < maxLinkLogs;
 
                     // Check if this d_link_datum (from the general D3 selection) corresponds to a link in highlightedLinkObjects
                     const isConnectedLink = highlightedLinkObjects.some(hlo =>
@@ -1061,11 +1093,13 @@
                     );
 
                     if (isConnectedLink) {
+                        if (logThisLink) console.log(`LOGGING: Link ${sourceId}->${targetId} IS CONNECTED. Applying .link-highlighted.`);
                         d3.select(this)
                             .classed('link-highlighted', true)
                             .classed('link-dimmed', false)
                             .attr('stroke-width', highlightedThicknessScale(d_link_datum.weight));
                     } else {
+                        if (logThisLink) console.log(`LOGGING: Link ${sourceId}->${targetId} is NOT connected. Applying .link-dimmed.`);
                         d3.select(this).classed('link-highlighted', false).classed('link-dimmed', true);
                         // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px !important)
                         // or could be set explicitly if CSS wasn't !important:
@@ -1074,6 +1108,7 @@
                         // To be safe, ensure it's thin if .link-dimmed CSS doesn't specify width.
                         // The .link-dimmed class has stroke-width: 0.5px !important, so this is fine.
                     }
+                    if (logThisLink) linkLogCounter++;
                 });
                 
                 // 更新表格中的高亮

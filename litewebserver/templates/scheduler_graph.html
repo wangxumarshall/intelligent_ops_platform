@@ -266,11 +266,15 @@
 
             let fullGraphData = { nodes: [], links: [] };
             let undirectedGraphData = { nodes: [], links: [] };
-            let currentGraphData = { nodes: [], links: [] };
+            // let currentGraphData = { nodes: [], links: [] }; // This wasn't consistently used; removing to avoid confusion
             let simulation;
             let currentHighlightedNode = null;
             let connectedNodes = new Map();
             let connectedLinks = new Set();
+
+            // Global cache for currently rendered graph structure by drawGraph
+            let currentlyDisplayedNodes = [];
+            let currentlyDisplayedLinks = [];
 
             // 阻止图表容器的滚轮事件冒泡到页面
             graphContainer.addEventListener('wheel', (e) => {
@@ -561,6 +565,10 @@
                 displayedNodesCountEl.textContent = nodes.length.toLocaleString();
                 displayedEdgesCountEl.textContent = filteredLinks.length.toLocaleString();
 
+                // Cache the exact nodes and links being rendered for BFS in highlightNodeConnections
+                currentlyDisplayedNodes = [...nodes]; // Store a copy
+                currentlyDisplayedLinks = [...filteredLinks]; // Store a copy
+
 
                 const width = container.clientWidth;
                 const height = container.clientHeight;
@@ -766,47 +774,73 @@
                 connectedNodes.clear();
                 connectedLinks.clear();
                 
-                // 使用广度优先搜索找到所有连通的节点
-                const isDirected = graphDirectionSelect.value === 'directed';
-                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
-                const maxDepth = +bfsDepthSelect.value; // Use new select element's value
+                const isDirected = graphDirectionSelect.value === 'directed'; // Keep for link directionality if needed in BFS
+                const maxDepth = +bfsDepthSelect.value;
+
+                // Use the cached currently displayed nodes and links for BFS
+                const nodesForBfs = currentlyDisplayedNodes;
+                const linksForBfs = currentlyDisplayedLinks;
+
+                // Check if the selected node for highlighting even exists in the currently displayed nodes.
+                const startNodeInDisplayed = nodesForBfs.find(n => n.id === nodeId);
+                if (!startNodeInDisplayed) {
+                    console.warn(`Node ${nodeId} selected for highlighting but not found in currently displayed nodes. Aborting highlight.`);
+                    // Reset to a clean state if the start node isn't even visible.
+                    // This might happen if filters changed between click and processing, though unlikely with current setup.
+                    d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false).attr('fill', '#4f46e5');
+                    d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
+                    d3.selectAll('.node text').classed('highlighted-node-text', false);
+                    // Ensure counts reflect the current general view if highlight aborts
+                    displayedNodesCountEl.textContent = currentlyDisplayedNodes.length.toLocaleString();
+                    displayedEdgesCountEl.textContent = currentlyDisplayedLinks.length.toLocaleString();
+                    currentHighlightedNode = null; // Clear highlight state
+                    return;
+                }
                 
-                // BFS初始化
                 const queue = [{id: nodeId, depth: 0}];
-                connectedNodes.set(nodeId, 0);
+                connectedNodes.set(nodeId, 0); // Map of {id: depth}
                 
-                // 执行BFS
-                while (queue.length > 0) {
-                    const {id, depth} = queue.shift();
+                let head = 0; // Using simple array queue, head index to simulate shift() for performance
+                while(head < queue.length) {
+                    const {id: currentId, depth: currentDepth} = queue[head++];
                     
-                    // 如果达到最大深度，不再继续扩展
-                    if (depth >= maxDepth) continue;
+                    if (currentDepth >= maxDepth) continue;
                     
-                    // 查找与当前节点相连的所有节点
-                    baseGraphData.links.forEach(link => {
-                        if (link.source === id) {
-                            const neighborId = link.target;
-                            if (!connectedNodes.has(neighborId)) {
-                                connectedNodes.set(neighborId, depth + 1);
-                                connectedLinks.add(`${link.source}-${link.target}`);
-                                queue.push({id: neighborId, depth: depth + 1});
-                            } else {
-                                connectedLinks.add(`${link.source}-${link.target}`);
-                            }
-                        } else if (link.target === id) {
-                            const neighborId = link.source;
-                            if (!connectedNodes.has(neighborId)) {
-                                connectedNodes.set(neighborId, depth + 1);
-                                connectedLinks.add(`${link.source}-${link.target}`);
-                                queue.push({id: neighborId, depth: depth + 1});
-                            } else {
-                                connectedLinks.add(`${link.source}-${link.target}`);
+                    linksForBfs.forEach(link => {
+                        // Ensure link source/target are IDs, not objects, for comparison
+                        const linkSourceId = (typeof link.source === 'object') ? link.source.id : link.source;
+                        const linkTargetId = (typeof link.target === 'object') ? link.target.id : link.target;
+
+                        let neighborId = null;
+
+                        if (linkSourceId === currentId) {
+                            neighborId = linkTargetId;
+                        } else if (!isDirected && linkTargetId === currentId) {
+                            neighborId = linkSourceId;
+                        }
+                        // For directed graphs, if link.target === currentId, it's an incoming link.
+                        // The current BFS explores "outgoing" from nodeId. If "incoming" also desired, logic here would change.
+
+                        if (neighborId) {
+                            // Check if neighbor is in the set of currently displayed nodes
+                            const neighborInDisplayed = nodesForBfs.find(n => n.id === neighborId);
+                            if (!neighborInDisplayed) return; // Skip if neighbor isn't currently visible
+
+                            const linkKey = `${linkSourceId}-${linkTargetId}`; // Canonical key for the link direction in BFS
+
+                            if (!connectedNodes.has(neighborId) || connectedNodes.get(neighborId) > currentDepth + 1) {
+                                connectedNodes.set(neighborId, currentDepth + 1);
+                                queue.push({id: neighborId, depth: currentDepth + 1});
+                                connectedLinks.add(linkKey);
+                            } else if (connectedNodes.has(neighborId) && (connectedNodes.get(neighborId) === currentDepth + 1 || currentDepth < connectedNodes.get(neighborId))) {
+                                // If already visited but this path is shorter or same (for multi-path to same node within depth)
+                                // ensure link is added if it's part of *any* valid path to a connected node
+                                connectedLinks.add(linkKey);
                             }
                         }
                     });
                 }
-                
-                console.log(`Found ${connectedNodes.size} connected nodes with depth limit ${maxDepth}`);
+                console.log(`BFS from ${nodeId} (depth ${maxDepth}) found ${connectedNodes.size} nodes and ${connectedLinks.size} links within the currently displayed graph.`);
                 
                 // 更新节点样式
                 d3.selectAll('.node circle').each(function(d) {

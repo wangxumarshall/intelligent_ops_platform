@@ -48,7 +48,7 @@
         }
 
         .arrowhead {
-            fill: #999;
+            fill: #333; /* Changed for better visibility */
         }
 
         .table-container {
@@ -634,14 +634,19 @@
                 if (isDirected) {
                     svg.append("defs").append("marker")
                         .attr("id", "arrowhead")
-                        .attr("viewBox", "0 0 10 10")
-                        .attr("refX", 9)
-                        .attr("refY", 5)
-                        .attr("markerWidth", 6)
-                        .attr("markerHeight", 6)
-                        .attr("orient", "auto")
+                        // viewBox="0 0 <marker-length> <marker-height>"
+                        .attr("viewBox", "0 0 10 7") // Adjusted viewBox for a 10x7 marker
+                        // refX is distance from node center to the marker's reference point (tip for this path)
+                        // Node radius is 8. We want the tip of the arrow to land near/on the circumference.
+                        // If path tip is at x=10, refX=8 means (8,3.5) of marker is at node center, tip is 2px past center.
+                        .attr("refX", 8)
+                        .attr("refY", 3.5) // Mid-point of marker height 7
+                        .attr("markerWidth", 10) // Visual width of the marker
+                        .attr("markerHeight", 7)  // Visual height of the marker
+                        .attr("orient", "auto") // Corrected: should be "auto" for marker-end
                         .append("path")
-                        .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                        // Path for a 10x7 arrowhead: M0,0 L10,3.5 L0,7
+                        .attr("d", "M 0 0 L 10 3.5 L 0 7 z")
                         .attr("class", "arrowhead");
                 }
 

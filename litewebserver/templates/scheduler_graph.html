@@ -75,7 +75,7 @@
 
         .link-highlighted {
             stroke: #f59e0b !important;
-            stroke-width: 2px !important;
+            /* stroke-width will be set by JS dynamically or to a fixed value */
             stroke-opacity: 0.8 !important;
         }
 
@@ -167,6 +167,7 @@
                     <span class="text-gray-400 mx-1">|</span>
                     
                     <input type="text" id="nodeSearch" placeholder="搜索任务名" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ml-2">
+                    {/* BFS Depth and Color Legend moved to the right-hand card */}
                 </div>
              </div>
         </div>
@@ -185,9 +186,9 @@
                 </div>
             </div>
 
-
-            <div class="metric-card lg:w-1/4 table-container p-3">
-                <div class="flex flex-row items-center justify-between space-x-2 mb-2 pt-1 border-t mt-2">
+            <div class="metric-card lg:w-1/4 table-container p-3"> {/* Added padding to the card */}
+                <div class="flex flex-row items-center justify-between space-x-2 mb-2 pt-1 border-t mt-2"> {/* Single row for controls */}
+                    {/* BFS Depth (compact) */}
                     <div class="flex items-center">
                         <label for="bfsDepthSelect" class="text-xs font-medium text-gray-600 mr-1 whitespace-nowrap">BFS:</label>
                         <select id="bfsDepthSelect" class="p-1 text-xs rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" style="min-width: 45px; max-width:55px;">
@@ -203,13 +204,11 @@
                             <option value="10">10</option>
                         </select>
                     </div>
-
                     {/* Color Legend (compact and horizontal) */}
                     <div class="flex items-center space-x-1">
-                        <span class="text-xs font-medium text-gray-600 hidden sm:inline">颜色</span> 
-                        <div class="flex items-center" title="源节点">
+                        <span class="text-xs font-medium text-gray-600 hidden sm:inline">Legend:</span> {/* Hide "Legend:" on very small screens if needed */}
+                        <div class="flex items-center" title="Source Node">
                             <div class="depth-level bg-orange-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">S</span>
-
                         </div>
                         <div class="flex items-center" title="Level 1">
                             <div class="depth-level bg-yellow-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">L1</span>
@@ -275,10 +274,12 @@
             let currentHighlightedNode = null;
             let connectedNodes = new Map();
             let connectedLinks = new Set();
+            let g; // Declare g here for wider scope, will be assigned in drawGraph
 
             // Global cache for currently rendered graph structure by drawGraph
             let currentlyDisplayedNodes = [];
             let currentlyDisplayedLinks = [];
+            let lastZoomTransform = null; // To store zoom state
 
             // 阻止图表容器的滚轮事件冒泡到页面
             graphContainer.addEventListener('wheel', (e) => {
@@ -568,7 +569,12 @@
                 const container = document.getElementById('graph-container');
                 const svg = d3.select("#graph-svg");
 
-                svg.selectAll("*").remove();
+                // Store last transform if available
+                if (g && d3.zoomTransform(svg.node()) !== d3.zoomIdentity) {
+                    lastZoomTransform = d3.zoomTransform(svg.node());
+                }
+
+                svg.selectAll("*").remove(); // This removes 'g' as well
 
                 // Update displayed node and edge counts based on the data *before* simulation
                 // These are the nodes and links that will be attempted to be rendered.
@@ -610,10 +616,12 @@
 
                 simulation = d3.forceSimulation(nodes)
                     .force("link", d3.forceLink(formattedLinks).id(d => d.id)
-                        .strength(d => 0.1 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))))
-                    .force("charge", d3.forceManyBody().strength(-400))
+                        .strength(d => 0.07 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))) // Slightly reduced link strength factor
+                        //.distance(50) // Optionally set a base link distance
+                        )
+                    .force("charge", d3.forceManyBody().strength(-600)) // Increased repulsion
                     .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collide", d3.forceCollide().radius(15));
+                    .force("collide", d3.forceCollide().radius(25).strength(0.8)); // Increased collision radius and added strength to collision
 
                 const linkGroup = g.append("g")
                     .selectAll("g")
@@ -735,6 +743,17 @@
                     });
 
                 svg.call(zoom);
+
+                // Apply the stored transform
+                if (lastZoomTransform) {
+                    // svg.call(zoom.transform, lastZoomTransform); //This is the correct way
+                    // For older d3, or if 'g' is the transformed element directly by zoom event:
+                     g.attr('transform', lastZoomTransform.toString());
+                     // To make the zoom behavior aware of this new transform:
+                     d3.select(svg.node()).call(zoom.transform, lastZoomTransform);
+
+                }
+
 
                 simulation.on("tick", () => {
                     linkGroup.select("line")
@@ -883,12 +902,72 @@
                 });
                 
                 // 更新边样式
-                d3.selectAll('.link-group line').each(function(d) {
-                    const linkKey = `${d.source.id}-${d.target.id}`;
-                    if (connectedLinks.has(linkKey) || connectedLinks.has(`${d.target.id}-${d.source.id}`)) {
+                const isFullscreenActive = document.fullscreenElement === graphContainer ||
+                                         document.mozFullScreenElement === graphContainer ||
+                                         document.webkitFullscreenElement === graphContainer ||
+                                         document.msFullscreenElement === graphContainer;
+
+                let highlightedLinkObjects = [];
+                if (connectedLinks.size > 0) { // connectedLinks stores keys like "sourceId-targetId" from BFS
+                    linksForBfs.forEach(linkFromDisplayed => { // linksForBfs is currentlyDisplayedLinks
+                        const sourceIdStr = (typeof linkFromDisplayed.source === 'object') ? linkFromDisplayed.source.id : linkFromDisplayed.source;
+                        const targetIdStr = (typeof linkFromDisplayed.target === 'object') ? linkFromDisplayed.target.id : linkFromDisplayed.target;
+
+                        // Check if this link (or its reverse for undirected) was found in BFS path
+                        if (connectedLinks.has(`${sourceIdStr}-${targetIdStr}`) ||
+                            (!isDirected && connectedLinks.has(`${targetIdStr}-${sourceIdStr}`))) {
+                             highlightedLinkObjects.push(linkFromDisplayed);
+                        }
+                    });
+                }
+
+                let localThicknessScale = null;
+                if (isFullscreenActive && highlightedLinkObjects.length > 0) {
+                    const weights = highlightedLinkObjects.map(l => l.weight);
+                    const minHighlightedWeight = d3.min(weights);
+                    const maxHighlightedWeight = d3.max(weights);
+
+                    if (minHighlightedWeight !== undefined && maxHighlightedWeight !== undefined) {
+                         localThicknessScale = d3.scaleLinear()
+                                                 .domain([minHighlightedWeight, maxHighlightedWeight])
+                                                 .range([1.5, 8]) // e.g., min 1.5px, max 8px for highlighted links
+                                                 .clamp(true);
+                        if (minHighlightedWeight === maxHighlightedWeight) { // All highlighted links have same weight
+                            localThicknessScale = () => 4; // Apply a medium fixed thickness, e.g. 4px
+                        }
+                    }
+                }
+
+                d3.selectAll('.link-group line').each(function(d_link_datum) {
+                    const sourceId = (typeof d_link_datum.source === 'object') ? d_link_datum.source.id : d_link_datum.source;
+                    const targetId = (typeof d_link_datum.target === 'object') ? d_link_datum.target.id : d_link_datum.target;
+
+                    let isConnected = false;
+                    // Check if this d_link_datum (from the general D3 selection) corresponds to a link in connectedLinks
+                    // connectedLinks stores keys based on BFS traversal.
+                    // A more robust way is to check if d_link_datum is in highlightedLinkObjects
+                    const thisLinkObject = highlightedLinkObjects.find(hlo =>
+                        ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === sourceId &&
+                         (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === targetId) ||
+                        ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === targetId && // check reverse, D3 data might be one way
+                         (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === sourceId)
+                    );
+                    isConnected = !!thisLinkObject;
+
+
+                    if (isConnected) {
                         d3.select(this).classed('link-highlighted', true).classed('link-dimmed', false);
+                        if (localThicknessScale) { // In fullscreen and scale is available for highlighted links
+                            d3.select(this).attr('stroke-width', localThicknessScale(d_link_datum.weight));
+                        } else { // Not in fullscreen or no scale (e.g. no highlighted links)
+                            d3.select(this).attr('stroke-width', 2.5); // Default fixed highlight thickness (slightly thicker than old 2px)
+                        }
                     } else {
                         d3.select(this).classed('link-highlighted', false).classed('link-dimmed', true);
+                        // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px)
+                        // or by the general scale in drawGraph if it's not !important.
+                        // To be safe, ensure it's thin if .link-dimmed CSS doesn't specify width.
+                        // The .link-dimmed class has stroke-width: 0.5px !important, so this is fine.
                     }
                 });
                 

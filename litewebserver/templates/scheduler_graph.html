@@ -201,6 +201,7 @@
                 reader.onerror = (error) => {{
                     placeholder.textContent = 'Error reading file.';
                     console.error('Error reading file:', error);
+                    linksTableBody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center">Error reading file.</td></tr>';
                 }};
                 reader.readAsText(file);
             }}

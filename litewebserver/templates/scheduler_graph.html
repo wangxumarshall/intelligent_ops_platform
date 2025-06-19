@@ -1266,35 +1266,31 @@
 
                 if (!targetRow) return; // Clicked outside of any row context
 
-                // Clear previous table row highlights first
+                // Clear all previous table row highlights first.
+                // This ensures that if a deselect happens, no rows remain highlighted from previous state.
                 document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
 
                 if (clickedTaskLink) {
                     const nodeId = clickedTaskLink.getAttribute('data-node-id');
+                    console.log(`Table Event: Task link clicked for node ID: ${nodeId}`);
 
-                    console.log(`Task link clicked for BFS: ${nodeId}`);
-
+                    // If a single specific link was highlighted from table (not BFS), clear that visual state.
+                    // highlightNodeConnections will take over for BFS display.
                     if (highlightedLinkFromTable) {
-                        updateGraphForTableLinkHighlight(true); // Clear single-link effects and sets highlightedLinkFromTable = null
+                        updateGraphForTableLinkHighlight(true); // true to clear only, sets highlightedLinkFromTable = null
                     }
 
-                    // Clear task-link specific styling from other cells before applying to current
-                    document.querySelectorAll('#links-table-body .task-link').forEach(link => {
-                        link.classList.remove('font-bold', 'text-indigo-700'); // Assuming this was for task-link specific emphasis
-                    });
-                    // Apply any specific styling to the clicked task-link itself if needed (e.g. bold)
-                    // clickedTaskLink.classList.add('font-bold', 'text-indigo-700'); // Example
+                    // Delegate all selection/deselection logic to highlightNodeConnections.
+                    // This function already handles toggling, setting currentHighlightedNode,
+                    // and updating task-link bolding.
+                    highlightNodeConnections(nodeId);
 
-                    targetRow.classList.add('bg-indigo-100'); // Highlight clicked row
-
-                    if (currentHighlightedNode === nodeId) { // Clicking same task link to deselect BFS
-                        console.log(`Deselecting BFS for node: ${nodeId}`);
-                        resetGraphFilter(); // Resets all highlights and redraws default graph
-                    } else { // Clicking new or different task link for BFS
-                        console.log(`Initiating BFS for node: ${nodeId}`);
-                        highlightNodeConnections(nodeId);
+                    // After highlightNodeConnections, currentHighlightedNode is either nodeId (if selected) or null (if deselected).
+                    // Re-apply highlight to the clicked row ONLY if the node ended up being selected.
+                    if (currentHighlightedNode === nodeId && targetRow) {
+                        targetRow.classList.add('bg-indigo-100');
                     }
-
+                    // Note: The bolding of the .task-link text itself is handled within highlightNodeConnections.
 
                 } else if (clickedSwitchesValue) {
                     const sourceId = targetRow.getAttribute('data-source-id');
@@ -1305,24 +1301,25 @@
                         console.warn("Row for switches click missing source/target ID.");
                         return;
                     }
-                    console.log(`Switches value clicked for edge: ${sourceId} -> ${targetId}, Weight: ${weight}`);
+                    console.log(`Table Event: Switches value clicked for edge: ${sourceId} -> ${targetId}, Weight: ${weight}`);
 
-                    if (currentHighlightedNode) { // If BFS highlight is active
-                        resetGraphFilter(); // Clears BFS highlight, currentHighlightedNode, and calls drawGraph
-                                            // resetGraphFilter also clears highlightedLinkFromTable.
+                    // If a BFS highlight is active, reset it before highlighting a single edge.
+                    if (currentHighlightedNode) {
+                        resetGraphFilter();
                     }
 
                     highlightedLinkFromTable = { sourceId, targetId, weight: parseInt(weight) };
-                    updateGraphForTableLinkHighlight(); // Apply single edge highlight styles
-                    targetRow.classList.add('bg-indigo-100');
+                    updateGraphForTableLinkHighlight(); // Apply single edge highlight styles in the graph.
+
+                    if (targetRow) { // Highlight the clicked row in the table.
+                        targetRow.classList.add('bg-indigo-100');
+                    }
 
                 } else {
                     // Clicked on a row but not on a specific interactive element (task-link or switches-value)
-                    // Optionally, could still implement the old general row click for single link highlight here,
-                    // or do nothing. For now, let's do nothing to keep it specific.
-                    console.log("Clicked on table row padding or non-specific area.");
+                    console.log("Table Event: Clicked on table row padding or non-specific area.");
+                    // No action needed here, row highlights were already cleared.
                 }
-
             });
 
             function updateGraphForTableLinkHighlight(clearOnly = false) {

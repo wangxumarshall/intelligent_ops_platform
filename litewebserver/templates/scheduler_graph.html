@@ -282,6 +282,7 @@
             let currentlyDisplayedLinks = [];
             let lastZoomTransform = null; // To store zoom state
             let highlightedLinkFromTable = null; // For Task 1: Edge Highlighting from Table
+            let bfsActiveNode = null; // 新增全局变量
 
             // Helper function to create a thickness scale for links
             function createThicknessScale(linksData, minPx = 1, maxPx = 8) {
@@ -472,15 +473,18 @@
                 const searchTerm = nodeSearchInput.value.trim().toLowerCase();
                 const threshold = +weightThresholdInput.value;
                 let nodes, links;
+                let highlightMode = false;
                 if (customData) {
                     nodes = customData.nodes;
                     links = customData.links;
+                    highlightMode = true;
+                    console.log('[drawGraph] customData模式: highlightMode=true, nodes:', nodes, 'links:', links);
                 } else {
                     if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) {
                         console.log('No graph data available');
                         return;
                     }
-                    console.log(`Threshold: ${threshold}, Directed: ${isDirected}, Search: ${searchTerm || 'none'}`);
+                    console.log(`[drawGraph] Threshold: ${threshold}, Directed: ${isDirected}, Search: ${searchTerm || 'none'}`);
                     const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
                     ({ nodes, links } = baseGraphData);
                     if (searchTerm) {
@@ -505,9 +509,9 @@
                     }
                     // 只在全图视图下做权重过滤
                     links = links.filter(link => link.weight >= threshold).sort((a, b) => b.weight - a.weight);
+                    console.log(`[drawGraph] 全图模式: nodes:`, nodes, 'links:', links);
                 }
-
-                console.log(`Starting with ${nodes.length} nodes and ${links.length} links`);
+                console.log(`[drawGraph] highlightMode=${highlightMode}, nodes.length=${nodes.length}, links.length=${links.length}`);
 
                 // If drawGraph is called for a general view (not during an active highlight that sets fx/fy),
                 // ensure all nodes are released from any prior fixed positions.
@@ -728,19 +732,20 @@
                     .attr("class", "node");
 
                 nodeGroup.append("circle")
-                    .attr("r", 8)
-                    .attr("fill", "#4f46e5")
-                    .attr("stroke", "#fff")
-                    .attr("stroke-width", 1.5);
+                    .attr("r", highlightMode ? 12 : 8)
+                    .attr("fill", highlightMode ? "#ff3b3b" : "#4f46e5")
+                    .attr("stroke", highlightMode ? "#ffd600" : "#fff")
+                    .attr("stroke-width", highlightMode ? 5 : 1.5);
 
                 nodeGroup.append("text")
                     .text(d => `${d.comm}/${d.pid}`)
-                    .attr("x", 12)
-                    .attr("y", 4)
-                    .attr("font-size", "12px")
+                    .attr("x", 16)
+                    .attr("y", 6)
+                    .attr("font-size", highlightMode ? "16px" : "12px")
                     .attr("font-family", "monospace")
-                    .attr("fill", "#333")
-                    .style("display", "none")
+                    .attr("fill", highlightMode ? "#d32f2f" : "#333")
+                    .attr("font-weight", highlightMode ? "bold" : "normal")
+                    .style("display", "block")
                     .style("pointer-events", "none");
 
                 nodeGroup.on("mouseover", function(event, d) {
@@ -785,18 +790,9 @@
                     .attr("class", "link-group");
 
                 const linkLine = linkGroup.append("line")
-                    .attr("stroke", "#999")
-                    .attr("stroke-opacity", 0.6);
-                    // stroke-width will be set dynamically below
-
-                // Dynamic edge thickness logic using the new helper function
-                // Using a range like [0.8, 10] for general view for potentially finer thin lines and thicker max lines
-                const thicknessScale = createThicknessScale(formattedLinks, 0.8, 10);
-                linkLine.attr("stroke-width", d => thicknessScale(d.weight));
-
-                if (isDirected) {
-                    linkLine.attr("marker-end", "url(#arrowhead)");
-                }
+                    .attr("stroke", highlightMode ? "#ffd600" : "#999")
+                    .attr("stroke-opacity", highlightMode ? 1 : 0.6)
+                    .attr("stroke-width", d => highlightMode ? 6 : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
 
                 linkGroup.append("text")
                     .text(d => d.weight)
@@ -859,39 +855,38 @@
                 
                 console.log('Graph drawing completed');
                 
-                // 如果有当前高亮节点，重新应用高亮
-                if (currentHighlightedNode) {
+                // 只在全图模式下自动高亮
+                if (!customData && currentHighlightedNode) {
+                    console.log('[drawGraph] 全图模式下自动高亮 currentHighlightedNode:', currentHighlightedNode);
                     highlightNodeConnections(currentHighlightedNode);
                 }
             }
 
             function highlightNodeConnections(nodeId) {
+                console.log('[highlightNodeConnections] 选中节点:', nodeId);
                 if (highlightedLinkFromTable) {
                     highlightedLinkFromTable = null;
                     document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
                 }
-                // bfsDepthSelect.style.display = 'none'; // 可选：隐藏 BFS 深度选择
-                // 以 weightThreshold 作为 BFS 层数
-                const maxDepth = +weightThresholdInput.value;
-                const isDirected = graphDirectionSelect.value === 'directed';
-                // BFS 只用全图数据
-                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
-                const nodesForBfs = baseGraphData.nodes;
-                const linksForBfs = baseGraphData.links;
-                // 如果点击同一节点，恢复全图
-                if (currentHighlightedNode === nodeId) {
+                if (bfsActiveNode === nodeId) {
+                    bfsActiveNode = null;
                     currentHighlightedNode = null;
                     connectedNodes.clear();
                     connectedLinks.clear();
                     document.querySelectorAll('.task-link').forEach(link => {
                         link.classList.remove('font-bold', 'text-indigo-700');
                     });
+                    console.log('[highlightNodeConnections] 取消高亮，恢复全图');
                     drawGraph();
                     return;
                 }
+                bfsActiveNode = nodeId;
                 currentHighlightedNode = nodeId;
-                connectedNodes.clear();
-                connectedLinks.clear();
+                const maxDepth = +weightThresholdInput.value;
+                const isDirected = graphDirectionSelect.value === 'directed';
+                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
+                const nodesForBfs = baseGraphData.nodes;
+                const linksForBfs = baseGraphData.links;
                 // BFS
                 const queue = [{id: nodeId, depth: 0}];
                 connectedNodes.set(nodeId, 0);
@@ -912,7 +907,6 @@
                             if (!connectedNodes.has(neighborId) || connectedNodes.get(neighborId) > currentDepth + 1) {
                                 connectedNodes.set(neighborId, currentDepth + 1);
                                 queue.push({id: neighborId, depth: currentDepth + 1});
-                                // 记录边
                                 let key;
                                 if (isDirected) {
                                     key = `${currentId}->${neighborId}`;
@@ -940,6 +934,7 @@
                     }
                     return connectedLinks.has(key);
                 });
+                console.log(`[highlightNodeConnections] BFS子图: bfsNodes.length=${bfsNodes.length}, bfsLinks.length=${bfsLinks.length}`);
                 // 高亮显示子图
                 drawGraph({nodes: bfsNodes, links: bfsLinks});
                 // 表格高亮

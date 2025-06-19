@@ -48,7 +48,7 @@
         }
 
         .arrowhead {
-            fill: #999;
+            fill: #333; /* Changed for better visibility */
         }
 
         .table-container {
@@ -281,6 +281,40 @@
             let currentlyDisplayedNodes = [];
             let currentlyDisplayedLinks = [];
             let lastZoomTransform = null; // To store zoom state
+            let highlightedLinkFromTable = null; // For Task 1: Edge Highlighting from Table
+
+            // Helper function to create a thickness scale for links
+            function createThicknessScale(linksData, minPx = 1, maxPx = 8) {
+                if (!linksData || linksData.length === 0) {
+                    return () => (minPx + maxPx) / 2; // Default for empty link sets
+                }
+
+                const weights = linksData.map(l => l.weight).filter(w => w > 0); // Filter out non-positive weights for scale domain
+
+                if (weights.length === 0) { // All links had zero or negative weight or were filtered
+                    return () => minPx; // Default to minPx if no positive weights
+                }
+
+                const minWeight = d3.min(weights);
+                const maxWeight = d3.max(weights);
+
+                // This case should ideally be caught by weights.length === 0 if min/max are undefined
+                if (minWeight === undefined || maxWeight === undefined) {
+                    return () => (minPx + maxPx) / 2;
+                }
+
+                if (minWeight === maxWeight) {
+                    // If all positive weights are the same, use a thickness in the middle of the range.
+                    return () => (minPx + maxPx) / 2;
+                }
+
+                // Use d3.scaleSqrt for better visual distinction of weights.
+                return d3.scaleSqrt()
+                         .domain([minWeight, maxWeight])
+                         .range([minPx, maxPx])
+                         .clamp(true);
+            }
+
 
             // 阻止图表容器的滚轮事件冒泡到页面
             graphContainer.addEventListener('wheel', (e) => {
@@ -448,9 +482,34 @@
                 
                 const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
                 
-                let { nodes, links } = baseGraphData;
+                let { nodes, links } = baseGraphData; // These are initially references from fullGraphData or undirectedGraphData
                 
                 console.log(`Starting with ${nodes.length} nodes and ${links.length} links`);
+
+                // If drawGraph is called for a general view (not during an active highlight that sets fx/fy),
+                // ensure all nodes are released from any prior fixed positions.
+                // currentHighlightedNode is null when deselecting or resetting.
+                // Note: highlightNodeConnections also clears fx/fy from simulation.nodes()
+                // before setting new ones, so this primarily covers the reset path and ensures
+                // the base node objects used by drawGraph are clean.
+                if (!currentHighlightedNode) {
+                    // Create a new array of node objects if nodes are just references, to avoid modifying source data cache directly,
+                    // OR ensure that fx/fy are properties solely managed by the simulation instances.
+                    // Given D3's behavior, fx/fy are often added to the original objects.
+                    // So, it's better to nullify them on the 'nodes' array that will be used.
+                    // This 'nodes' array is a fresh copy or filtered list at this point.
+                    const allNodesToClear = simulation ? simulation.nodes() : (isDirected ? fullGraphData.nodes : undirectedGraphData.nodes);
+                    allNodesToClear.forEach(n => {
+                        n.fx = null;
+                        n.fy = null;
+                    });
+                    // If 'nodes' is a filtered subset, ensure those are also cleared.
+                    // This might be redundant if 'allNodesToClear' covers them, but safer.
+                    nodes.forEach(n => { // 'nodes' is the array that will be passed to the new simulation
+                        n.fx = null;
+                        n.fy = null;
+                    });
+                }
                 
                 if (searchTerm) {
                     const matchedNodes = nodes.filter(node => {
@@ -542,7 +601,11 @@
                         }
 
                         const row = linksTableBody.insertRow();
-                        row.className = 'bg-white border-b hover:bg-gray-50 transition-colors';
+                        row.className = 'bg-white border-b hover:bg-gray-50 transition-colors cursor-pointer'; // Added cursor-pointer
+                        row.setAttribute('data-source-id', sourceId);
+                        row.setAttribute('data-target-id', targetId);
+                        row.setAttribute('data-weight', link.weight);
+
 
                         const cellNodeA = row.insertCell();
                         cellNodeA.innerHTML = sourceNode ? `<span class="task-link" data-node-id="${sourceId}">${sourceNode.comm}/${sourceNode.pid}</span>` : sourceId;
@@ -571,11 +634,15 @@
                 const svg = d3.select("#graph-svg");
 
                 // Store last transform if available
-                if (g && d3.zoomTransform(svg.node()) !== d3.zoomIdentity) {
-                    lastZoomTransform = d3.zoomTransform(svg.node());
+                // Check if svg.node() exists and is zoomable before getting transform
+                if (svg.node() && typeof d3.zoomTransform === 'function' && svg.node().__zoom !== undefined && svg.node().__zoom !== d3.zoomIdentity) {
+                     if (g) { // Ensure global g was previously defined (e.g. from a previous draw)
+                        lastZoomTransform = d3.zoomTransform(svg.node());
+                     }
                 }
 
-                svg.selectAll("*").remove(); // This removes 'g' as well
+
+                svg.selectAll("*").remove(); // This removes 'g' as well if it was part of svg's children
 
                 // Update displayed node and edge counts based on the data *before* simulation
                 // These are the nodes and links that will be attempted to be rendered.
@@ -592,19 +659,24 @@
                 const width = container.clientWidth;
                 const height = container.clientHeight;
 
-                const g = svg.append("g");
+                g = svg.append("g"); // Assign to the higher-scoped 'g'
 
                 if (isDirected) {
                     svg.append("defs").append("marker")
                         .attr("id", "arrowhead")
-                        .attr("viewBox", "0 0 10 10")
-                        .attr("refX", 9)
-                        .attr("refY", 5)
-                        .attr("markerWidth", 6)
-                        .attr("markerHeight", 6)
+                        // viewBox="0 0 <marker-length> <marker-height>"
+                        .attr("viewBox", "0 0 5 3.5") // Adjusted viewBox for a 5x3.5 marker
+                        // refX is distance from node center to the marker's reference point.
+                        // Node radius is 8. Path tip is at x=5. refX=4 means (4,1.75) of marker is at node center.
+                        // Tip (5,1.75) is 1px past node center.
+                        .attr("refX", 4)
+                        .attr("refY", 1.75) // Mid-point of marker height 3.5
+                        .attr("markerWidth", 5) // Visual width of the marker
+                        .attr("markerHeight", 3.5)  // Visual height of the marker
                         .attr("orient", "auto")
                         .append("path")
-                        .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                        // Path for a 5x3.5 arrowhead: M0,0 L5,1.75 L0,3.5
+                        .attr("d", "M 0 0 L 5 1.75 L 0 3.5 z")
                         .attr("class", "arrowhead");
                 }
 
@@ -624,63 +696,7 @@
                     .force("center", d3.forceCenter(width / 2, height / 2))
                     .force("collide", d3.forceCollide().radius(22).strength(0.7)); // Moderately increased collision radius with custom strength
 
-                const linkGroup = g.append("g")
-                    .selectAll("g")
-                    .data(formattedLinks)
-                    .join("g")
-                    .attr("class", "link-group");
-
-                const linkLine = linkGroup.append("line")
-                    .attr("stroke", "#999")
-                    .attr("stroke-opacity", 0.6);
-                    // stroke-width will be set dynamically below
-
-                // Dynamic edge thickness logic
-                if (formattedLinks.length > 0) {
-                    const minWeight = d3.min(formattedLinks, l => l.weight);
-                    const maxWeight = d3.max(formattedLinks, l => l.weight);
-
-                    // Create a scale for stroke width. Adjust range for visual preference.
-                    // Using a linear scale from 1px to 8px. Sqrt scale could also be an option.
-                    const thicknessScale = d3.scaleLinear()
-                                             .domain([minWeight, maxWeight])
-                                             .range([1, 8]) // Min/max stroke width in pixels
-                                             .clamp(true); // Ensure output is within range
-
-                    linkLine.attr("stroke-width", d => thicknessScale(d.weight));
-                } else {
-                    linkLine.attr("stroke-width", 1); // Default if no links or all links have same weight
-                }
-                
-                if (isDirected) {
-                    linkLine.attr("marker-end", "url(#arrowhead)");
-                }
-
-                linkGroup.append("text")
-                    .text(d => d.weight)
-                    .attr("font-size", "10px")
-                    .attr("font-family", "sans-serif")
-                    .attr("fill", "#333")
-                    .attr("stroke", "white")
-                    .attr("stroke-width", 0.4)
-                    .attr("paint-order", "stroke")
-                    .style("display", "none")
-                    .style("pointer-events", "none");
-
-                linkGroup
-                    .on("mouseover", function(event, d) {
-                        d3.select(this).select('text').style('display', 'block');
-                        tooltip.style("opacity", 1).html(`切换次数: ${d.weight}`);
-                    })
-                    .on("mousemove", (event) => {
-                        tooltip.style("left", (event.pageX + 15) + "px")
-                               .style("top", (event.pageY - 28) + "px");
-                    })
-                    .on("mouseout", function() {
-                        d3.select(this).select('text').style('display', 'none');
-                        tooltip.style("opacity", 0);
-                    });
-
+                // Draw nodes first so links (and arrowheads) appear on top.
                 const nodeGroup = g.append("g")
                     .selectAll("g")
                     .data(nodes)
@@ -737,6 +753,53 @@
 
                 nodeGroup.call(drag);
 
+                // Now, draw links so they appear on top of nodes.
+                const linkGroup = g.append("g")
+                    .selectAll("g")
+                    .data(formattedLinks)
+                    .join("g")
+                    .attr("class", "link-group");
+
+                const linkLine = linkGroup.append("line")
+                    .attr("stroke", "#999")
+                    .attr("stroke-opacity", 0.6);
+                    // stroke-width will be set dynamically below
+
+                // Dynamic edge thickness logic using the new helper function
+                // Using a range like [0.8, 10] for general view for potentially finer thin lines and thicker max lines
+                const thicknessScale = createThicknessScale(formattedLinks, 0.8, 10);
+                linkLine.attr("stroke-width", d => thicknessScale(d.weight));
+
+                if (isDirected) {
+                    linkLine.attr("marker-end", "url(#arrowhead)");
+                }
+
+                linkGroup.append("text")
+                    .text(d => d.weight)
+                    .attr("font-size", "10px")
+                    .attr("font-family", "sans-serif")
+                    .attr("fill", "#333")
+                    .attr("stroke", "white")
+                    .attr("stroke-width", 0.4)
+                    .attr("paint-order", "stroke")
+                    .style("display", "none")
+                    .style("pointer-events", "none");
+
+                linkGroup
+                    .on("mouseover", function(event, d) {
+                        d3.select(this).select('text').style('display', 'block');
+                        tooltip.style("opacity", 1).html(`切换次数: ${d.weight}`);
+                    })
+                    .on("mousemove", (event) => {
+                        tooltip.style("left", (event.pageX + 15) + "px")
+                               .style("top", (event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function() {
+                        d3.select(this).select('text').style('display', 'none');
+                        tooltip.style("opacity", 0);
+                    });
+
+
                 const zoom = d3.zoom()
                     .scaleExtent([0.1, 10])
                     .on("zoom", (event) => {
@@ -779,10 +842,19 @@
             }
 
             function highlightNodeConnections(nodeId) {
+                // If a single link from table was highlighted, clear that state first.
+                if (highlightedLinkFromTable) {
+                    highlightedLinkFromTable = null;
+                    document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
+                    // The call to drawGraph() or subsequent style updates in this function will override single link styles.
+                }
+
                 const currentBfsDepth = bfsDepthSelect.value; // Use new select element
                 console.log(`Highlighting connections for node: ${nodeId} with BFS depth: ${currentBfsDepth}`);
                 
-                // 重置之前的高亮状态
+                // 重置之前的高亮状态 (visual styles related to BFS highlighting)
+                // Note: fx/fy clearing and node/link styling for BFS happens later in this function.
+                // The lines below primarily reset classes, which is fine.
                 d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
                 d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
                 d3.selectAll('.node text').classed('highlighted-node-text', false);
@@ -858,7 +930,7 @@
                             const neighborInDisplayed = nodesForBfs.find(n => n.id === neighborId);
                             if (!neighborInDisplayed) return; // Skip if neighbor isn't currently visible
 
-                            const linkKey = `${linkSourceId}-${linkTargetId}`; // Canonical key for the link direction in BFS
+                            const linkKey = `${linkSourceId}->${linkTargetId}`; // Standardized key with '->'
 
                             if (!connectedNodes.has(neighborId) || connectedNodes.get(neighborId) > currentDepth + 1) {
                                 connectedNodes.set(neighborId, currentDepth + 1);
@@ -873,36 +945,82 @@
                     });
                 }
                 console.log(`BFS from ${nodeId} (depth ${maxDepth}) found ${connectedNodes.size} nodes and ${connectedLinks.size} links within the currently displayed graph.`);
+
+                // Clear fx, fy for all nodes before applying new hierarchical layout
+                // This ensures nodes not in the current selection are released
+                simulation.nodes().forEach(node => {
+                    node.fx = null;
+                    node.fy = null;
+                });
+
+                // Group nodes by BFS depth
+                const nodesByDepth = [];
+                connectedNodes.forEach((depth, id) => {
+                    while (nodesByDepth.length <= depth) {
+                        nodesByDepth.push([]);
+                    }
+                    // Find the actual node object to store, not just ID
+                    const nodeObject = simulation.nodes().find(n => n.id === id);
+                    if (nodeObject) {
+                         nodesByDepth[depth].push(nodeObject);
+                    }
+                });
+
+                const containerWidth = graphContainer.clientWidth;
+                // const containerHeight = graphContainer.clientHeight; // Not strictly needed for Y calc this way
+                const initialOffsetY = 80; // Increased offset from top
+                const levelHeight = 120;  // Increased vertical spacing between levels
+
+                nodesByDepth.forEach((nodesInLevel, depth) => {
+                    const targetY = initialOffsetY + depth * levelHeight;
+                    const numNodesInLevel = nodesInLevel.length;
+                    const nodeVisualRadius = 8; // Actual node radius
+                    const minNodeSpacing = 16; // Desired minimum space between node edges (e.g., one diameter)
+
+                    const requiredWidthForLevel = (numNodesInLevel * nodeVisualRadius * 2) + Math.max(0, numNodesInLevel - 1) * minNodeSpacing;
+                    let startXForLevel = (containerWidth - requiredWidthForLevel) / 2;
+
+                    // If requiredWidthForLevel is greater than containerWidth, start from a fixed padding
+                    // to prevent negative startX, allowing content to flow off-screen.
+                    if (requiredWidthForLevel > containerWidth) {
+                        startXForLevel = 20; // Or some other small padding
+                    }
+
+                    nodesInLevel.forEach((node, i) => {
+                        node.fx = startXForLevel + (i * (nodeVisualRadius * 2 + minNodeSpacing)) + nodeVisualRadius;
+                        node.fy = targetY; // targetY is already calculated for the current depth
+                    });
+                });
                 
-                // 更新节点样式
-                d3.selectAll('.node circle').each(function(d) {
-                    if (connectedNodes.has(d.id)) {
-                        const depth = connectedNodes.get(d.id);
+                // Reheat simulation slightly to let links adjust to new fixed positions
+                if (simulation) {
+                    simulation.alpha(0.1).restart();
+                }
+
+
+                // Update node visual styles (colors, sizes)
+                d3.selectAll('.node circle').each(function(d_node) { // d_node is the datum from D3
+                    const isConnected = connectedNodes.has(d_node.id);
+                    if (isConnected) {
+                        const depth = connectedNodes.get(d_node.id);
                         let fillColor;
-                        
-                        // 根据深度设置不同的颜色
-                        if (depth === 0) {
-                            fillColor = '#f59e0b'; // 源节点
-                        } else if (depth === 1) {
-                            fillColor = '#eab308'; // 一级节点
-                        } else {
-                            fillColor = '#22c55e'; // 二级及以上节点
-                        }
+                        if (depth === 0) fillColor = '#f59e0b'; // Source
+                        else if (depth === 1) fillColor = '#eab308'; // Level 1
+                        else fillColor = '#22c55e'; // Level 2+
                         
                         d3.select(this)
                             .attr('fill', fillColor)
                             .classed('node-highlighted', true)
                             .classed('node-dimmed', false);
-                            
-                        // 显示高亮节点的文本
-                        d3.select(this.parentNode).select('text')
-                            .classed('highlighted-node-text', true);
+                        d3.select(this.parentNode).select('text').classed('highlighted-node-text', true);
                     } else {
+                        // For nodes not in connectedNodes, ensure they are dimmed and fx/fy are cleared (done above)
                         d3.select(this).classed('node-highlighted', false).classed('node-dimmed', true);
+                         d3.select(this.parentNode).select('text').classed('highlighted-node-text', false);
                     }
                 });
                 
-                // 更新边样式
+                // Update link visual styles
                 const isFullscreenActive = document.fullscreenElement === graphContainer ||
                                          document.mozFullScreenElement === graphContainer ||
                                          document.webkitFullscreenElement === graphContainer ||
@@ -922,50 +1040,34 @@
                     });
                 }
 
-                let localThicknessScale = null;
-                if (isFullscreenActive && highlightedLinkObjects.length > 0) {
-                    const weights = highlightedLinkObjects.map(l => l.weight);
-                    const minHighlightedWeight = d3.min(weights);
-                    const maxHighlightedWeight = d3.max(weights);
-
-                    if (minHighlightedWeight !== undefined && maxHighlightedWeight !== undefined) {
-                         localThicknessScale = d3.scaleLinear()
-                                                 .domain([minHighlightedWeight, maxHighlightedWeight])
-                                                 .range([1.5, 8]) // e.g., min 1.5px, max 8px for highlighted links
-                                                 .clamp(true);
-                        if (minHighlightedWeight === maxHighlightedWeight) { // All highlighted links have same weight
-                            localThicknessScale = () => 4; // Apply a medium fixed thickness, e.g. 4px
-                        }
-                    }
-                }
+                // Create a thickness scale for the highlighted links.
+                // This will now apply regardless of fullscreen mode.
+                // Using a range like [1.5, 10] to make highlighted links generally a bit thicker.
+                const highlightedThicknessScale = createThicknessScale(highlightedLinkObjects, 1.5, 10);
 
                 d3.selectAll('.link-group line').each(function(d_link_datum) {
                     const sourceId = (typeof d_link_datum.source === 'object') ? d_link_datum.source.id : d_link_datum.source;
                     const targetId = (typeof d_link_datum.target === 'object') ? d_link_datum.target.id : d_link_datum.target;
 
-                    let isConnected = false;
-                    // Check if this d_link_datum (from the general D3 selection) corresponds to a link in connectedLinks
-                    // connectedLinks stores keys based on BFS traversal.
-                    // A more robust way is to check if d_link_datum is in highlightedLinkObjects
-                    const thisLinkObject = highlightedLinkObjects.find(hlo =>
+                    // Check if this d_link_datum (from the general D3 selection) corresponds to a link in highlightedLinkObjects
+                    const isConnectedLink = highlightedLinkObjects.some(hlo =>
                         ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === sourceId &&
                          (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === targetId) ||
-                        ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === targetId && // check reverse, D3 data might be one way
+                        // For undirected graphs, the link might be stored reversed in highlightedLinkObjects compared to d_link_datum
+                        (!isDirected && (typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === targetId &&
                          (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === sourceId)
                     );
-                    isConnected = !!thisLinkObject;
 
-
-                    if (isConnected) {
-                        d3.select(this).classed('link-highlighted', true).classed('link-dimmed', false);
-                        if (localThicknessScale) { // In fullscreen and scale is available for highlighted links
-                            d3.select(this).attr('stroke-width', localThicknessScale(d_link_datum.weight));
-                        } else { // Not in fullscreen or no scale (e.g. no highlighted links)
-                            d3.select(this).attr('stroke-width', 2.5); // Default fixed highlight thickness (slightly thicker than old 2px)
-                        }
+                    if (isConnectedLink) {
+                        d3.select(this)
+                            .classed('link-highlighted', true)
+                            .classed('link-dimmed', false)
+                            .attr('stroke-width', highlightedThicknessScale(d_link_datum.weight));
                     } else {
                         d3.select(this).classed('link-highlighted', false).classed('link-dimmed', true);
-                        // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px)
+                        // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px !important)
+                        // or could be set explicitly if CSS wasn't !important:
+                        // .attr('stroke-width', 0.5);
                         // or by the general scale in drawGraph if it's not !important.
                         // To be safe, ensure it's thin if .link-dimmed CSS doesn't specify width.
                         // The .link-dimmed class has stroke-width: 0.5px !important, so this is fine.
@@ -992,15 +1094,20 @@
                     // This is a bit inefficient if linksForBfs is large.
                     // Consider if connectedLinks should store link objects or if weights need to be summed differently.
                     // For now, assuming linkKey is sufficient if currentlyDisplayedLinks contains these keys.
-                    const parts = linkKey.split('-');
-                    const sourceId = parts[0]; // This assumes no hyphens in IDs themselves
-                    const targetId = parts.slice(1).join('-'); // To handle hyphens in target ID
+                    const parts = linkKey.split('->'); // Standardized key with '->'
+                    const sourceIdKey = parts[0];
+                    const targetIdKey = parts[1]; // Assuming targetId does not contain '->'
 
-                    const actualLink = allLinksForWeightLookup.find(l =>
-                        ((typeof l.source === 'object' ? l.source.id : l.source) === sourceId &&
-                         (typeof l.target === 'object' ? l.target.id : l.target) === targetId) ||
-                        (!isDirected && (typeof l.source === 'object' ? l.source.id : l.source) === targetId &&
-                         (typeof l.target === 'object' ? l.target.id : l.target) === sourceId) // check reverse for undirected
+                    const actualLink = allLinksForWeightLookup.find(l => {
+                        const lSource = typeof l.source === 'object' ? l.source.id : l.source;
+                        const lTarget = typeof l.target === 'object' ? l.target.id : l.target;
+                        // When isDirected, we only care about the exact match.
+                        // The !isDirected check for reverse is implicitly handled because for undirected,
+                        // allLinksForWeightLookup would contain links with sorted source/target,
+                        // and BFS keys would also be generated from sorted IDs (this needs verification for undirected BFS keys).
+                        // For directed mode (which is the context of this bug), this direct check is correct.
+                        return (lSource === sourceIdKey && lTarget === targetIdKey);
+                    }
                     );
                     if (actualLink) {
                         highlightedSwitchesCount += actualLink.weight;
@@ -1011,10 +1118,21 @@
 
             function resetGraphFilter() {
                 console.log('Resetting graph filter');
-                
-                currentHighlightedNode = null; // Clear any highlighted node state
+
+                // Clear single link highlight state from table
+                highlightedLinkFromTable = null;
+                document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
+                // updateGraphForTableLinkHighlight(); // Call to reset styles if it was active
+                // No, drawGraph will reset styles.
+
+                currentHighlightedNode = null; // Clear any BFS node highlight state
                 connectedNodes.clear();
                 connectedLinks.clear();
+                // Clear any node selection styling from table cells (task-links)
+                 document.querySelectorAll('#links-table-body .task-link').forEach(link => {
+                    link.classList.remove('font-bold', 'text-indigo-700');
+                });
+
 
                 // Reset input fields to defaults if desired, or simply redraw
                 // weightThresholdInput.value = "50"; // Or initial default
@@ -1044,11 +1162,26 @@
             }
 
             // Fullscreen API handling
+            function isFullscreenApiAvailable() {
+                return document.fullscreenEnabled ||
+                       document.mozFullScreenEnabled ||
+                       document.webkitFullscreenEnabled ||
+                       document.msFullscreenEnabled || false;
+            }
+
             function toggleFullscreen() {
-                if (!document.fullscreenElement &&
-                    !document.mozFullScreenElement &&
-                    !document.webkitFullscreenElement &&
-                    !document.msFullscreenElement) { // Not in fullscreen
+                const isCurrentlyFullscreen = document.fullscreenElement ||
+                                            document.mozFullScreenElement ||
+                                            document.webkitFullscreenElement ||
+                                            document.msFullscreenElement;
+
+                if (!isCurrentlyFullscreen) { // Not in fullscreen, try to enter
+                    if (!isFullscreenApiAvailable()) {
+                        console.warn("Fullscreen API is not available or not allowed in this context (e.g., missing iframe 'allowfullscreen' attribute).");
+                        alert("Fullscreen mode is not available or not allowed in this environment."); // Optional: alert user
+                        return;
+                    }
+
                     if (graphContainer.requestFullscreen) {
                         graphContainer.requestFullscreen();
                     } else if (graphContainer.mozRequestFullScreen) { /* Firefox */
@@ -1058,7 +1191,7 @@
                     } else if (graphContainer.msRequestFullscreen) { /* IE/Edge */
                         graphContainer.msRequestFullscreen();
                     }
-                } else { // In fullscreen
+                } else { // In fullscreen, try to exit
                     if (document.exitFullscreen) {
                         document.exitFullscreen();
                     } else if (document.mozCancelFullScreen) { /* Firefox */
@@ -1118,6 +1251,120 @@
             // Initial button state update
             updateFullscreenButton();
 
+            // --- Task 1: Edge Highlighting from Table Click ---
+            linksTableBody.addEventListener('click', function(event) {
+                let targetRow = event.target.closest('tr');
+                if (!targetRow || !targetRow.hasAttribute('data-source-id')) {
+                    console.log('Clicked outside a valid table row or row has no link data.');
+                    return;
+                }
+
+                const sourceId = targetRow.getAttribute('data-source-id');
+                const targetId = targetRow.getAttribute('data-target-id');
+                const weight = targetRow.getAttribute('data-weight');
+
+                console.log(`Table link clicked: ${sourceId} -> ${targetId}, Weight: ${weight}`);
+
+                // If a node highlight (BFS) is active, reset it first
+                if (currentHighlightedNode) {
+                    // Temporarily store clicked link info to re-apply after reset clears everything
+                    const clickedLinkInfo = { sourceId, targetId, weight: parseInt(weight) };
+                    resetGraphFilter(); // This will clear currentHighlightedNode and redraw graph
+                    highlightedLinkFromTable = clickedLinkInfo; // Set after reset
+                } else {
+                    highlightedLinkFromTable = { sourceId, targetId, weight: parseInt(weight) };
+                }
+
+                // Clear any node selection styling from table cells (task-links)
+                 document.querySelectorAll('#links-table-body .task-link').forEach(link => {
+                    link.classList.remove('font-bold', 'text-indigo-700');
+                });
+                // Add highlight to the clicked row in table
+                document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
+                targetRow.classList.add('bg-indigo-100');
+
+
+                updateGraphForTableLinkHighlight();
+                // No need to call drawGraph() here as updateGraphForTableLinkHighlight will adjust styles
+            });
+
+            function updateGraphForTableLinkHighlight() {
+                if (!simulation || !simulation.nodes() || !g) {
+                    console.warn("Simulation or graph group not ready for single link highlight.");
+                    return;
+                }
+                 // Ensure currentHighlightedNode (BFS highlight) is cleared
+                if (currentHighlightedNode) {
+                    // This case should ideally be handled before calling this function,
+                    // by calling resetGraphFilter which nullifies currentHighlightedNode.
+                    // But as a safeguard:
+                    console.warn("BFS highlight active while trying to highlight single link. Resetting BFS highlight first.");
+                    currentHighlightedNode = null; // Prevent BFS styling from interfering
+                    connectedNodes.clear();
+                    connectedLinks.clear();
+                     // We might need to call drawGraph() to fully reset visuals before applying single link highlight
+                    // For now, let's assume the caller (table click) handles this.
+                }
+
+
+                if (!highlightedLinkFromTable) {
+                    // This function might be called by resetGraphFilter to clear the highlight
+                    // Reset all link and node styles to default if no specific link is highlighted
+                    g.selectAll('.link-group line')
+                        .attr('stroke', '#999')
+                        .attr('stroke-opacity', 0.6)
+                        // Re-apply original thickness based on weight
+                        .each(function(d_link) {
+                            const generalThicknessScale = createThicknessScale(currentlyDisplayedLinks, 0.8, 10);
+                            d3.select(this).attr('stroke-width', generalThicknessScale(d_link.weight));
+                        });
+                    g.selectAll('.link-group text').style('display', 'none');
+
+                    g.selectAll('.node circle')
+                        .attr('fill', '#4f46e5') // Default node color
+                        .attr('r', 8)
+                        .classed('node-highlighted', false)
+                        .classed('node-dimmed', false);
+                    g.selectAll('.node text').style('display', 'none').classed('highlighted-node-text', false);
+                    return;
+                }
+
+                const { sourceId, targetId, weight } = highlightedLinkFromTable;
+
+                g.selectAll('.link-group').each(function(d_link) {
+                    const line = d3.select(this).select('line');
+                    const text = d3.select(this).select('text');
+                    const linkSourceId = typeof d_link.source === 'object' ? d_link.source.id : d_link.source;
+                    const linkTargetId = typeof d_link.target === 'object' ? d_link.target.id : d_link.target;
+
+                    if (linkSourceId === sourceId && linkTargetId === targetId) {
+                        line.attr('stroke', '#1e40af') // Distinct highlight color (e.g., strong blue)
+                            .attr('stroke-opacity', 1)
+                            .attr('stroke-width', Math.max(createThicknessScale([d_link], 1.5, 10)(d_link.weight), 4)); // Make it noticeably thick
+                        text.style('display', 'block').style('font-weight', 'bold');
+                    } else {
+                        line.attr('stroke', '#e5e7eb') // Dim color
+                            .attr('stroke-opacity', 0.3)
+                            .attr('stroke-width', 0.5);
+                        text.style('display', 'none');
+                    }
+                });
+
+                g.selectAll('.node').each(function(d_node) {
+                    const circle = d3.select(this).select('circle');
+                    const text = d3.select(this).select('text');
+                    if (d_node.id === sourceId || d_node.id === targetId) {
+                        circle.attr('fill', '#f59e0b') // Highlight color for connected nodes
+                              .attr('r', 10);
+                        text.style('display', 'block').classed('highlighted-node-text', true);
+                    } else {
+                        circle.attr('fill', '#d1d5db') // Dim color for other nodes
+                              .attr('r', 5);
+                        text.style('display', 'none').classed('highlighted-node-text', false);
+                    }
+                });
+            }
+            // --- End Task 1 ---
         });
     </script>
 </body>

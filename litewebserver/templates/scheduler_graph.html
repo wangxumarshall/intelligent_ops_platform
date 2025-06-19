@@ -481,9 +481,34 @@
                 
                 const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
                 
-                let { nodes, links } = baseGraphData;
+                let { nodes, links } = baseGraphData; // These are initially references from fullGraphData or undirectedGraphData
                 
                 console.log(`Starting with ${nodes.length} nodes and ${links.length} links`);
+
+                // If drawGraph is called for a general view (not during an active highlight that sets fx/fy),
+                // ensure all nodes are released from any prior fixed positions.
+                // currentHighlightedNode is null when deselecting or resetting.
+                // Note: highlightNodeConnections also clears fx/fy from simulation.nodes()
+                // before setting new ones, so this primarily covers the reset path and ensures
+                // the base node objects used by drawGraph are clean.
+                if (!currentHighlightedNode) {
+                    // Create a new array of node objects if nodes are just references, to avoid modifying source data cache directly,
+                    // OR ensure that fx/fy are properties solely managed by the simulation instances.
+                    // Given D3's behavior, fx/fy are often added to the original objects.
+                    // So, it's better to nullify them on the 'nodes' array that will be used.
+                    // This 'nodes' array is a fresh copy or filtered list at this point.
+                    const allNodesToClear = simulation ? simulation.nodes() : (isDirected ? fullGraphData.nodes : undirectedGraphData.nodes);
+                    allNodesToClear.forEach(n => {
+                        n.fx = null;
+                        n.fy = null;
+                    });
+                    // If 'nodes' is a filtered subset, ensure those are also cleared.
+                    // This might be redundant if 'allNodesToClear' covers them, but safer.
+                    nodes.forEach(n => { // 'nodes' is the array that will be passed to the new simulation
+                        n.fx = null;
+                        n.fy = null;
+                    });
+                }
                 
                 if (searchTerm) {
                     const matchedNodes = nodes.filter(node => {
@@ -635,7 +660,6 @@
                     svg.append("defs").append("marker")
                         .attr("id", "arrowhead")
                         // viewBox="0 0 <marker-length> <marker-height>"
-
                         .attr("viewBox", "0 0 5 3.5") // Adjusted viewBox for a 5x3.5 marker
                         // refX is distance from node center to the marker's reference point.
                         // Node radius is 8. Path tip is at x=5. refX=4 means (4,1.75) of marker is at node center.
@@ -667,7 +691,7 @@
                     .force("center", d3.forceCenter(width / 2, height / 2))
                     .force("collide", d3.forceCollide().radius(22).strength(0.7)); // Moderately increased collision radius with custom strength
 
-
+                // Draw nodes first so links (and arrowheads) appear on top.
                 const nodeGroup = g.append("g")
                     .selectAll("g")
                     .data(nodes)
@@ -907,36 +931,86 @@
                     });
                 }
                 console.log(`BFS from ${nodeId} (depth ${maxDepth}) found ${connectedNodes.size} nodes and ${connectedLinks.size} links within the currently displayed graph.`);
-                
-                // 更新节点样式
-                d3.selectAll('.node circle').each(function(d) {
-                    if (connectedNodes.has(d.id)) {
-                        const depth = connectedNodes.get(d.id);
-                        let fillColor;
-                        
-                        // 根据深度设置不同的颜色
-                        if (depth === 0) {
-                            fillColor = '#f59e0b'; // 源节点
-                        } else if (depth === 1) {
-                            fillColor = '#eab308'; // 一级节点
+
+                // Clear fx, fy for all nodes before applying new hierarchical layout
+                // This ensures nodes not in the current selection are released
+                simulation.nodes().forEach(node => {
+                    node.fx = null;
+                    node.fy = null;
+                });
+
+                // Group nodes by BFS depth
+                const nodesByDepth = [];
+                connectedNodes.forEach((depth, id) => {
+                    while (nodesByDepth.length <= depth) {
+                        nodesByDepth.push([]);
+                    }
+                    // Find the actual node object to store, not just ID
+                    const nodeObject = simulation.nodes().find(n => n.id === id);
+                    if (nodeObject) {
+                         nodesByDepth[depth].push(nodeObject);
+                    }
+                });
+
+                const containerWidth = graphContainer.clientWidth;
+                // const containerHeight = graphContainer.clientHeight; // Not strictly needed for Y calc this way
+                const initialOffsetY = 80; // Increased offset from top
+                const levelHeight = 120;  // Increased vertical spacing between levels
+
+                nodesByDepth.forEach((nodesInLevel, depth) => {
+                    const targetY = initialOffsetY + depth * levelHeight;
+                    const numNodesInLevel = nodesInLevel.length;
+                    // Ensure horizontalSpacing is reasonable even for many nodes.
+                    // Add some padding at the sides.
+                    const effectiveWidth = containerWidth * 0.9; // Use 90% of width for nodes
+                    const sidePadding = containerWidth * 0.05;
+                    const horizontalSpacing = effectiveWidth / Math.max(1, numNodesInLevel);
+
+
+                    nodesInLevel.forEach((node, i) => {
+                        // Spread nodes more evenly, handle single node case
+                        let targetX;
+                        if (numNodesInLevel === 1) {
+                            targetX = containerWidth / 2;
                         } else {
-                            fillColor = '#22c55e'; // 二级及以上节点
+                            // Distribute from (0.5 * spacing) to (width - 0.5 * spacing)
+                            targetX = sidePadding + (i * horizontalSpacing) + (horizontalSpacing / 2);
                         }
                         
+                        node.fx = targetX;
+                        node.fy = targetY;
+                    });
+                });
+
+                // Reheat simulation slightly to let links adjust to new fixed positions
+                if (simulation) {
+                    simulation.alpha(0.1).restart();
+                }
+
+
+                // Update node visual styles (colors, sizes)
+                d3.selectAll('.node circle').each(function(d_node) { // d_node is the datum from D3
+                    const isConnected = connectedNodes.has(d_node.id);
+                    if (isConnected) {
+                        const depth = connectedNodes.get(d_node.id);
+                        let fillColor;
+                        if (depth === 0) fillColor = '#f59e0b'; // Source
+                        else if (depth === 1) fillColor = '#eab308'; // Level 1
+                        else fillColor = '#22c55e'; // Level 2+
+
                         d3.select(this)
                             .attr('fill', fillColor)
                             .classed('node-highlighted', true)
                             .classed('node-dimmed', false);
-                            
-                        // 显示高亮节点的文本
-                        d3.select(this.parentNode).select('text')
-                            .classed('highlighted-node-text', true);
+                        d3.select(this.parentNode).select('text').classed('highlighted-node-text', true);
                     } else {
+                        // For nodes not in connectedNodes, ensure they are dimmed and fx/fy are cleared (done above)
                         d3.select(this).classed('node-highlighted', false).classed('node-dimmed', true);
+                         d3.select(this.parentNode).select('text').classed('highlighted-node-text', false);
                     }
                 });
                 
-                // 更新边样式
+                // Update link visual styles
                 const isFullscreenActive = document.fullscreenElement === graphContainer ||
                                          document.mozFullScreenElement === graphContainer ||
                                          document.webkitFullscreenElement === graphContainer ||

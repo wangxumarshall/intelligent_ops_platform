@@ -1259,6 +1259,7 @@
 
             // --- Task 1: Edge Highlighting from Table Click ---
             linksTableBody.addEventListener('click', function(event) {
+
                 const clickedTaskLink = event.target.closest('.task-link');
                 const clickedSwitchesValue = event.target.closest('.switches-value');
                 const targetRow = event.target.closest('tr');
@@ -1270,6 +1271,7 @@
 
                 if (clickedTaskLink) {
                     const nodeId = clickedTaskLink.getAttribute('data-node-id');
+
                     console.log(`Task link clicked for BFS: ${nodeId}`);
 
                     if (highlightedLinkFromTable) {
@@ -1292,6 +1294,7 @@
                         console.log(`Initiating BFS for node: ${nodeId}`);
                         highlightNodeConnections(nodeId);
                     }
+
 
                 } else if (clickedSwitchesValue) {
                     const sourceId = targetRow.getAttribute('data-source-id');
@@ -1319,6 +1322,7 @@
                     // or do nothing. For now, let's do nothing to keep it specific.
                     console.log("Clicked on table row padding or non-specific area.");
                 }
+
             });
 
             function updateGraphForTableLinkHighlight(clearOnly = false) {
@@ -1371,10 +1375,14 @@
                 if (currentHighlightedNode) {
                     console.warn("updateGraphForTableLinkHighlight (applying highlight) called while currentHighlightedNode is active. BFS highlight should be cleared by caller first.");
                     // For safety, clearing BFS fixed positions if any. Styles will be overridden below.
+
                     simulation.nodes().forEach(n => { n.fx = null; n.fy = null; });
                     currentHighlightedNode = null;
                     connectedNodes.clear();
                     connectedLinks.clear();
+
+                     // A full drawGraph() might be better here to reset all node/link states before applying single link highlight.
+                    // For now, we assume the caller (table click listener) has called resetGraphFilter if needed.
                 }
 
                 const { sourceId, targetId, weight } = highlightedLinkFromTable;

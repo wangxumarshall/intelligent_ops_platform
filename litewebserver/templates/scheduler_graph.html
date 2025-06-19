@@ -1136,11 +1136,26 @@
             }
 
             // Fullscreen API handling
+            function isFullscreenApiAvailable() {
+                return document.fullscreenEnabled ||
+                       document.mozFullScreenEnabled ||
+                       document.webkitFullscreenEnabled ||
+                       document.msFullscreenEnabled || false;
+            }
+
             function toggleFullscreen() {
-                if (!document.fullscreenElement &&
-                    !document.mozFullScreenElement &&
-                    !document.webkitFullscreenElement &&
-                    !document.msFullscreenElement) { // Not in fullscreen
+                const isCurrentlyFullscreen = document.fullscreenElement ||
+                                            document.mozFullScreenElement ||
+                                            document.webkitFullscreenElement ||
+                                            document.msFullscreenElement;
+
+                if (!isCurrentlyFullscreen) { // Not in fullscreen, try to enter
+                    if (!isFullscreenApiAvailable()) {
+                        console.warn("Fullscreen API is not available or not allowed in this context (e.g., missing iframe 'allowfullscreen' attribute).");
+                        alert("Fullscreen mode is not available or not allowed in this environment."); // Optional: alert user
+                        return;
+                    }
+
                     if (graphContainer.requestFullscreen) {
                         graphContainer.requestFullscreen();
                     } else if (graphContainer.mozRequestFullScreen) { /* Firefox */
@@ -1150,7 +1165,7 @@
                     } else if (graphContainer.msRequestFullscreen) { /* IE/Edge */
                         graphContainer.msRequestFullscreen();
                     }
-                } else { // In fullscreen
+                } else { // In fullscreen, try to exit
                     if (document.exitFullscreen) {
                         document.exitFullscreen();
                     } else if (document.mozCancelFullScreen) { /* Firefox */

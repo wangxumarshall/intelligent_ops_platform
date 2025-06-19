@@ -99,7 +99,7 @@
                  <!-- Graph Controls -->
                 <div id="graph-controls" class="hidden items-center space-x-2">
                     <label for="weightThreshold" class="text-sm font-medium text-gray-700 whitespace-nowrap">最小调度次数:</label>
-                    <input type="number" id="weightThreshold" value="1" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <input type="number" id="weightThreshold" value="90" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                 </div>
              </div>
         </div>
@@ -264,7 +264,50 @@
                 if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) return;
 
                 const threshold = +weightThresholdInput.value;
-                const {{ nodes, links }} = fullGraphData;
+                // Use a deep copy for nodes and links to avoid modifying fullGraphData directly
+                let { nodes, links: initialLinks } = JSON.parse(JSON.stringify(fullGraphData));
+
+                // Transform initialLinks to have source/target as objects {id: "stringId", ...}
+                // This makes link.source.id and link.target.id valid.
+                let links = initialLinks.map(link => {
+                    const sourceNode = nodes.find(n => n.id === link.source);
+                    const targetNode = nodes.find(n => n.id === link.target);
+                    if (!sourceNode || !targetNode) {
+                        return null; // Mark for removal
+                    }
+                    return {
+                        ...link,
+                        source: sourceNode,
+                        target: targetNode
+                    };
+                }).filter(link => link !== null); // Remove links where nodes were not found
+
+                // Node search filtering logic (CHANGE 1 from prompt)
+                // Assumes a search input with id 'nodeSearchInput' exists in HTML.
+                // To prevent errors if it doesn't exist, this example defaults to no search.
+                const searchInput = document.getElementById('nodeSearchInput');
+                const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
+
+                let finalNodes = nodes; // By default, all nodes are candidates
+
+                if (searchTerm) {
+                    const matchedNodeIds = new Set(
+                        nodes.filter(node => node.id.toLowerCase().includes(searchTerm))
+                             .map(node => node.id)
+                    );
+
+                    if (matchedNodeIds.size > 0) {
+                        // Applying Change 1: matchedNodeIds.has(link.source.id) and matchedNodeIds.has(link.target.id)
+                        links = links.filter(link =>
+                            matchedNodeIds.has(link.source.id) && matchedNodeIds.has(link.target.id)
+                        );
+                        finalNodes = nodes.filter(node => matchedNodeIds.has(node.id));
+                    } else {
+                        links = [];
+                        finalNodes = [];
+                    }
+                }
+                // End of Change 1 block
 
                 const filteredLinks = links.filter(link => link.weight >= threshold);
 
@@ -283,11 +326,13 @@
                         row.className = 'bg-white border-b'; // Added for styling
 
                         const cellNodeA = row.insertCell();
-                        cellNodeA.textContent = link.source.id !== undefined ? link.source.id : link.source;
+                        // Prioritize comm/pid if available, fallback to id, then 'N/A'
+                        cellNodeA.textContent = (link.source && typeof link.source === 'object' && link.source.comm && link.source.pid) ? `${link.source.comm}/${link.source.pid}` : (link.source ? link.source.id : 'N/A');
                         cellNodeA.className = 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap'; // Added for styling
 
                         const cellNodeB = row.insertCell();
-                        cellNodeB.textContent = link.target.id !== undefined ? link.target.id : link.target;
+                        // Prioritize comm/pid if available, fallback to id, then 'N/A'
+                        cellNodeB.textContent = (link.target && typeof link.target === 'object' && link.target.comm && link.target.pid) ? `${link.target.comm}/${link.target.pid}` : (link.target ? link.target.id : 'N/A');
                         cellNodeB.className = 'px-6 py-4'; // Added for styling
 
                         const cellSwitches = row.insertCell();
@@ -303,14 +348,26 @@
 
                 svg.selectAll("*").remove();
 
+                // Change 2: Determine nodes for simulation based on filteredLinks
+                const nodesIdsInFilteredLinks = new Set();
+                filteredLinks.forEach(link => {
+                    nodesIdsInFilteredLinks.add(link.source.id); // link.source is an object
+                    nodesIdsInFilteredLinks.add(link.target.id); // link.target is an object
+                });
+
+                // Filter `finalNodes` (which might be search-filtered nodes or all nodes)
+                // to include only those that are part of the links passing the threshold.
+                const nodesForSimulation = finalNodes.filter(node => nodesIdsInFilteredLinks.has(node.id));
+
                 const width = container.clientWidth;
                 const height = container.clientHeight;
 
                 const g = svg.append("g");
 
                 // --- D3 Simulation Setup ---
-                simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(links).id(d => d.id)
+                // Use nodesForSimulation and filteredLinks for the D3 graph
+                simulation = d3.forceSimulation(nodesForSimulation)
+                    .force("link", d3.forceLink(filteredLinks).id(d => d.id) // Use filteredLinks
                         .strength(d => 0.1 * Math.sqrt(d.weight / maxWeight)))
                     .force("charge", d3.forceManyBody().strength(-400))
                     .force("center", d3.forceCenter(width / 2, height / 2))

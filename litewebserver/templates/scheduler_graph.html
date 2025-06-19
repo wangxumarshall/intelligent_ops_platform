@@ -971,13 +971,13 @@
                 const containerWidth = graphContainer.clientWidth;
                 // const containerHeight = graphContainer.clientHeight; // Not strictly needed for Y calc this way
                 const initialOffsetY = 80; // Increased offset from top
-                const levelHeight = 120;  // Increased vertical spacing between levels
+                const levelHeight = 150;  // Increased vertical spacing between levels (was 120)
 
                 nodesByDepth.forEach((nodesInLevel, depth) => {
                     const targetY = initialOffsetY + depth * levelHeight;
                     const numNodesInLevel = nodesInLevel.length;
                     const nodeVisualRadius = 8; // Actual node radius
-                    const minNodeSpacing = 16; // Desired minimum space between node edges (e.g., one diameter)
+                    const minNodeSpacing = 24; // Desired minimum space between node edges (was 16)
 
                     const requiredWidthForLevel = (numNodesInLevel * nodeVisualRadius * 2) + Math.max(0, numNodesInLevel - 1) * minNodeSpacing;
                     let startXForLevel = (containerWidth - requiredWidthForLevel) / 2;

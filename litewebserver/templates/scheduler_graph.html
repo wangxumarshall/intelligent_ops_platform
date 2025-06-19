@@ -185,7 +185,8 @@
                 </div>
             </div>
 
-            <div class="metric-card lg:w-1/4 table-container p-3">
+
+            <div class="metric-card lg:w-1/4 table-container p-3"> {/* Added padding to the card */}
                 <div class="flex flex-row items-center justify-between space-x-2 mb-2 pt-1 border-t mt-2"> 
 
                     <div class="flex items-center">
@@ -203,8 +204,10 @@
                             <option value="10">10</option>
                         </select>
                     </div>
+
                     <div class="flex items-center space-x-1">
-                        <span class="text-xs font-medium text-gray-600 hidden sm:inline">Legend:</span> 
+                        <span class="text-xs font-medium text-gray-600 hidden sm:inline">Legend:</span>
+
                         <div class="flex items-center" title="Source Node">
                             <div class="depth-level bg-orange-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">S</span>
                         </div>
@@ -614,12 +617,12 @@
 
                 simulation = d3.forceSimulation(nodes)
                     .force("link", d3.forceLink(formattedLinks).id(d => d.id)
-                        .strength(d => 0.07 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))) // Slightly reduced link strength factor
-                        //.distance(50) // Optionally set a base link distance
+
+                        .strength(d => 0.08 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))) // Re-introduced dynamic link strength
                         )
-                    .force("charge", d3.forceManyBody().strength(-600)) // Increased repulsion
+                    .force("charge", d3.forceManyBody().strength(-500)) // Moderately increased repulsion
                     .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collide", d3.forceCollide().radius(25).strength(0.8)); // Increased collision radius and added strength to collision
+                    .force("collide", d3.forceCollide().radius(22).strength(0.7)); // Moderately increased collision radius with custom strength
 
                 const linkGroup = g.append("g")
                     .selectAll("g")

@@ -571,11 +571,15 @@
                 const svg = d3.select("#graph-svg");
 
                 // Store last transform if available
-                if (g && d3.zoomTransform(svg.node()) !== d3.zoomIdentity) {
-                    lastZoomTransform = d3.zoomTransform(svg.node());
+                // Check if svg.node() exists and is zoomable before getting transform
+                if (svg.node() && typeof d3.zoomTransform === 'function' && svg.node().__zoom !== undefined && svg.node().__zoom !== d3.zoomIdentity) {
+                     if (g) { // Ensure global g was previously defined (e.g. from a previous draw)
+                        lastZoomTransform = d3.zoomTransform(svg.node());
+                     }
                 }
 
-                svg.selectAll("*").remove(); // This removes 'g' as well
+
+                svg.selectAll("*").remove(); // This removes 'g' as well if it was part of svg's children
 
                 // Update displayed node and edge counts based on the data *before* simulation
                 // These are the nodes and links that will be attempted to be rendered.
@@ -592,7 +596,7 @@
                 const width = container.clientWidth;
                 const height = container.clientHeight;
 
-                const g = svg.append("g");
+                g = svg.append("g"); // Assign to the higher-scoped 'g'
 
                 if (isDirected) {
                     svg.append("defs").append("marker")

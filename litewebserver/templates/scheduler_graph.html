@@ -1259,6 +1259,7 @@
 
             // --- Task 1: Edge Highlighting from Table Click ---
             linksTableBody.addEventListener('click', function(event) {
+
                 const clickedTaskLink = event.target.closest('.task-link');
                 const clickedSwitchesValue = event.target.closest('.switches-value');
                 const targetRow = event.target.closest('tr');
@@ -1308,11 +1309,14 @@
                     // or do nothing. For now, let's do nothing to keep it specific.
                     console.log("Clicked on table row padding or non-specific area.");
                 }
+
             });
 
             function updateGraphForTableLinkHighlight() {
                 if (!simulation || !simulation.nodes() || !g) {
+
                     console.warn("Simulation or graph group not ready for single link highlight/clear.");
+
                     return;
                 }
                  // Ensure currentHighlightedNode (BFS highlight) is cleared
@@ -1327,6 +1331,7 @@
                      // We might need to call drawGraph() to fully reset visuals before applying single link highlight
                     // For now, let's assume the caller (table click) handles this.
                 }
+
 
 
                 if (!highlightedLinkFromTable) { // Called to clear single-link-highlight styles
@@ -1372,6 +1377,7 @@
                      // A full drawGraph() might be better here to reset all node/link states before applying single link highlight.
                     // For now, we assume the caller (table click listener) has called resetGraphFilter if needed.
                 }
+
 
 
                 const { sourceId, targetId, weight } = highlightedLinkFromTable;

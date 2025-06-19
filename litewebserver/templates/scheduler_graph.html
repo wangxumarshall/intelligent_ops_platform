@@ -467,23 +467,46 @@
                 };
             }
 
-            function drawGraph() {
-                console.log('Drawing graph with current settings...');
-                if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) {
-                    console.log('No graph data available');
-                    return;
-                }
-
-                const threshold = +weightThresholdInput.value;
+            function drawGraph(customData = null) {
                 const isDirected = graphDirectionSelect.value === 'directed';
                 const searchTerm = nodeSearchInput.value.trim().toLowerCase();
-                
-                console.log(`Threshold: ${threshold}, Directed: ${isDirected}, Search: ${searchTerm || 'none'}`);
-                
-                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
-                
-                let { nodes, links } = baseGraphData; // These are initially references from fullGraphData or undirectedGraphData
-                
+                const threshold = +weightThresholdInput.value;
+                let nodes, links;
+                if (customData) {
+                    nodes = customData.nodes;
+                    links = customData.links;
+                } else {
+                    if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) {
+                        console.log('No graph data available');
+                        return;
+                    }
+                    console.log(`Threshold: ${threshold}, Directed: ${isDirected}, Search: ${searchTerm || 'none'}`);
+                    const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
+                    ({ nodes, links } = baseGraphData);
+                    if (searchTerm) {
+                        const matchedNodes = nodes.filter(node => {
+                            const match = node.id.toLowerCase().includes(searchTerm) || 
+                                (node.comm && node.comm.toLowerCase().includes(searchTerm)) ||
+                                (node.pid && node.pid.toLowerCase().includes(searchTerm));
+                            return match;
+                        });
+                        if (matchedNodes.length === 0) {
+                            nodes = [];
+                            links = [];
+                        } else {
+                            const matchedNodeIds = new Set(matchedNodes.map(node => node.id));
+                            links = links.filter(link => matchedNodeIds.has(link.source) || matchedNodeIds.has(link.target));
+                            const nodesInLinks = new Set([
+                                ...links.map(link => link.source),
+                                ...links.map(link => link.target)
+                            ]);
+                            nodes = nodes.filter(node => nodesInLinks.has(node.id));
+                        }
+                    }
+                    // 只在全图视图下做权重过滤
+                    links = links.filter(link => link.weight >= threshold).sort((a, b) => b.weight - a.weight);
+                }
+
                 console.log(`Starting with ${nodes.length} nodes and ${links.length} links`);
 
                 // If drawGraph is called for a general view (not during an active highlight that sets fx/fy),
@@ -843,24 +866,19 @@
             }
 
             function highlightNodeConnections(nodeId) {
-                // If a single link from table was highlighted, clear that state first.
                 if (highlightedLinkFromTable) {
                     highlightedLinkFromTable = null;
                     document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
-                    // The call to drawGraph() or subsequent style updates in this function will override single link styles.
                 }
-
-                const currentBfsDepth = bfsDepthSelect.value; // Use new select element
-                console.log(`Highlighting connections for node: ${nodeId} with BFS depth: ${currentBfsDepth}`);
-                
-                // 重置之前的高亮状态 (visual styles related to BFS highlighting)
-                // Note: fx/fy clearing and node/link styling for BFS happens later in this function.
-                // The lines below primarily reset classes, which is fine.
-                d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
-                d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
-                d3.selectAll('.node text').classed('highlighted-node-text', false);
-                
-                // 如果点击同一个节点，取消高亮
+                // bfsDepthSelect.style.display = 'none'; // 可选：隐藏 BFS 深度选择
+                // 以 weightThreshold 作为 BFS 层数
+                const maxDepth = +weightThresholdInput.value;
+                const isDirected = graphDirectionSelect.value === 'directed';
+                // BFS 只用全图数据
+                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
+                const nodesForBfs = baseGraphData.nodes;
+                const linksForBfs = baseGraphData.links;
+                // 如果点击同一节点，恢复全图
                 if (currentHighlightedNode === nodeId) {
                     currentHighlightedNode = null;
                     connectedNodes.clear();
@@ -868,250 +886,63 @@
                     document.querySelectorAll('.task-link').forEach(link => {
                         link.classList.remove('font-bold', 'text-indigo-700');
                     });
-                    // When un-highlighting, revert to counts from the main drawGraph function
-                    // This typically means re-calling drawGraph or ensuring its last calculated counts are displayed.
-                    // For simplicity here, we'll call drawGraph to reset view and counts.
                     drawGraph();
                     return;
                 }
-                
                 currentHighlightedNode = nodeId;
                 connectedNodes.clear();
                 connectedLinks.clear();
-                
-                const isDirected = graphDirectionSelect.value === 'directed'; // Keep for link directionality if needed in BFS
-                const maxDepth = +bfsDepthSelect.value;
-
-                // Use the cached currently displayed nodes and links for BFS
-                const nodesForBfs = currentlyDisplayedNodes;
-                const linksForBfs = currentlyDisplayedLinks;
-
-                // Check if the selected node for highlighting even exists in the currently displayed nodes.
-                const startNodeInDisplayed = nodesForBfs.find(n => n.id === nodeId);
-                if (!startNodeInDisplayed) {
-                    console.warn(`Node ${nodeId} selected for highlighting but not found in currently displayed nodes. Aborting highlight.`);
-                    // Reset to a clean state if the start node isn't even visible.
-                    // This might happen if filters changed between click and processing, though unlikely with current setup.
-                    d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false).attr('fill', '#4f46e5');
-                    d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
-                    d3.selectAll('.node text').classed('highlighted-node-text', false);
-                    // Ensure counts reflect the current general view if highlight aborts
-                    // Corrected variable names:
-                    filteredNodesValEl.textContent = currentlyDisplayedNodes.length.toLocaleString();
-                    filteredEdgesValEl.textContent = currentlyDisplayedLinks.length.toLocaleString();
-                    currentHighlightedNode = null; // Clear highlight state
-                    return;
-                }
-                
+                // BFS
                 const queue = [{id: nodeId, depth: 0}];
-                connectedNodes.set(nodeId, 0); // Map of {id: depth}
-                
-                let head = 0; // Using simple array queue, head index to simulate shift() for performance
+                connectedNodes.set(nodeId, 0);
+                let head = 0;
                 while(head < queue.length) {
                     const {id: currentId, depth: currentDepth} = queue[head++];
-                    
                     if (currentDepth >= maxDepth) continue;
-                    
                     linksForBfs.forEach(link => {
-                        // Ensure link source/target are IDs, not objects, for comparison
                         const linkSourceId = (typeof link.source === 'object') ? link.source.id : link.source;
                         const linkTargetId = (typeof link.target === 'object') ? link.target.id : link.target;
-
                         let neighborId = null;
-
                         if (linkSourceId === currentId) {
                             neighborId = linkTargetId;
                         } else if (!isDirected && linkTargetId === currentId) {
                             neighborId = linkSourceId;
                         }
-                        // For directed graphs, if link.target === currentId, it's an incoming link.
-                        // The current BFS explores "outgoing" from nodeId. If "incoming" also desired, logic here would change.
-
                         if (neighborId) {
-                            // Check if neighbor is in the set of currently displayed nodes
-                            const neighborInDisplayed = nodesForBfs.find(n => n.id === neighborId);
-                            if (!neighborInDisplayed) return; // Skip if neighbor isn't currently visible
-
-                            let linkKey;
-                            if (isDirected) {
-                                linkKey = `${currentId}-${neighborId}`;
-                            } else {
-                                const ids = [currentId, neighborId].sort();
-                                linkKey = `${ids[0]}-${ids[1]}`;
-                            }
-
                             if (!connectedNodes.has(neighborId) || connectedNodes.get(neighborId) > currentDepth + 1) {
                                 connectedNodes.set(neighborId, currentDepth + 1);
                                 queue.push({id: neighborId, depth: currentDepth + 1});
-                                connectedLinks.add(linkKey);
-                            } else if (connectedNodes.has(neighborId) && (connectedNodes.get(neighborId) === currentDepth + 1 || currentDepth < connectedNodes.get(neighborId))) {
-                                // If already visited but this path is shorter or same (for multi-path to same node within depth)
-                                // ensure link is added if it's part of *any* valid path to a connected node
-                                connectedLinks.add(linkKey); // Add the same canonical key
+                                // 记录边
+                                let key;
+                                if (isDirected) {
+                                    key = `${currentId}->${neighborId}`;
+                                } else {
+                                    const ids = [currentId, neighborId].sort();
+                                    key = `${ids[0]}->${ids[1]}`;
+                                }
+                                connectedLinks.add(key);
                             }
                         }
                     });
                 }
-                const finalConnectedLinksArray = Array.from(connectedLinks);
-                console.log(`BFS from ${nodeId} (depth ${maxDepth}) found ${connectedNodes.size} nodes (${Array.from(connectedNodes.keys()).slice(0,3).join(',')},...) and ${finalConnectedLinksArray.length} unique links (${finalConnectedLinksArray.slice(0,3).join(',')},...).`);
-                if (connectedNodes.size > 0) {
-                    const sampleNodes = Array.from(connectedNodes.keys()).slice(0, 5);
-                    console.log(`LOGGING: Sample of connectedNode IDs: ${sampleNodes.join(', ')} (${connectedNodes.size} total)`);
-                }
-
-                // Clear fx, fy for all nodes before applying new hierarchical layout
-                // This ensures nodes not in the current selection are released
-                simulation.nodes().forEach(node => {
-                    node.fx = null;
-                    node.fy = null;
-                });
-
-                // Group nodes by BFS depth
-                const nodesByDepth = [];
-                connectedNodes.forEach((depth, id) => {
-                    while (nodesByDepth.length <= depth) {
-                        nodesByDepth.push([]);
-                    }
-                    // Find the actual node object to store, not just ID
-                    const nodeObject = simulation.nodes().find(n => n.id === id);
-                    if (nodeObject) {
-                         nodesByDepth[depth].push(nodeObject);
-                    }
-                });
-
-                const containerWidth = graphContainer.clientWidth;
-                // const containerHeight = graphContainer.clientHeight; // Not strictly needed for Y calc this way
-                const initialOffsetY = 80; // Increased offset from top
-                const levelHeight = 150;  // Increased vertical spacing between levels (was 120)
-
-                nodesByDepth.forEach((nodesInLevel, depth) => {
-                    const targetY = initialOffsetY + depth * levelHeight;
-                    const numNodesInLevel = nodesInLevel.length;
-                    const nodeVisualRadius = 8; // Actual node radius
-                    const minNodeSpacing = 24; // Desired minimum space between node edges (was 16)
-
-                    const requiredWidthForLevel = (numNodesInLevel * nodeVisualRadius * 2) + Math.max(0, numNodesInLevel - 1) * minNodeSpacing;
-                    let startXForLevel = (containerWidth - requiredWidthForLevel) / 2;
-
-                    // If requiredWidthForLevel is greater than containerWidth, start from a fixed padding
-                    // to prevent negative startX, allowing content to flow off-screen.
-                    if (requiredWidthForLevel > containerWidth) {
-                        startXForLevel = 20; // Or some other small padding
-                    }
-
-                    nodesInLevel.forEach((node, i) => {
-                        node.fx = startXForLevel + (i * (nodeVisualRadius * 2 + minNodeSpacing)) + nodeVisualRadius;
-                        node.fy = targetY; // targetY is already calculated for the current depth
-                    });
-                });
-                
-                // Reheat simulation slightly to let links adjust to new fixed positions
-                if (simulation) {
-                    simulation.alpha(0.1).restart();
-                }
-
-
-                // Update node visual styles (colors, sizes)
-                let nodeLogCounter = 0;
-                const maxNodeLogs = 5;
-                d3.selectAll('.node circle').each(function(d_node) { // d_node is the datum from D3
-                    const isConnected = connectedNodes.has(d_node.id);
-                    let logThisNode = nodeLogCounter < maxNodeLogs || d_node.id === nodeId; // Log first few and always the start node
-
-                    if (isConnected) {
-                        const depth = connectedNodes.get(d_node.id);
-                        let fillColor;
-                        if (depth === 0) fillColor = '#f59e0b'; // Source
-                        else if (depth === 1) fillColor = '#eab308'; // Level 1
-                        else fillColor = '#22c55e'; // Level 2+
-                        
-                        if (logThisNode) console.log(`LOGGING: Node ${d_node.id} IS CONNECTED (depth ${depth}). Applying highlight styles.`);
-
-                        d3.select(this)
-                            .attr('fill', fillColor)
-                            .classed('node-highlighted', true)
-                            .classed('node-dimmed', false);
-                        d3.select(this.parentNode).select('text').classed('highlighted-node-text', true);
+                // 构造子图数据
+                const bfsNodeIds = new Set(connectedNodes.keys());
+                const bfsNodes = nodesForBfs.filter(n => bfsNodeIds.has(n.id));
+                const bfsLinks = linksForBfs.filter(link => {
+                    const s = (typeof link.source === 'object') ? link.source.id : link.source;
+                    const t = (typeof link.target === 'object') ? link.target.id : link.target;
+                    let key;
+                    if (isDirected) {
+                        key = `${s}->${t}`;
                     } else {
-                        if (logThisNode) console.log(`LOGGING: Node ${d_node.id} is NOT connected. Applying .node-dimmed.`);
-                        // For nodes not in connectedNodes, ensure they are dimmed and fx/fy are cleared (done above)
-                        d3.select(this).classed('node-highlighted', false).classed('node-dimmed', true);
-                         d3.select(this.parentNode).select('text').classed('highlighted-node-text', false);
+                        const ids = [s, t].sort();
+                        key = `${ids[0]}->${ids[1]}`;
                     }
-                    if (logThisNode) nodeLogCounter++;
+                    return connectedLinks.has(key);
                 });
-                
-                // Update link visual styles
-                const isFullscreenActive = document.fullscreenElement === graphContainer ||
-                                         document.mozFullScreenElement === graphContainer ||
-                                         document.webkitFullscreenElement === graphContainer ||
-                                         document.msFullscreenElement === graphContainer;
-
-                let highlightedLinkObjects = [];
-                if (connectedLinks.size > 0 && linksForBfs) {
-                    linksForBfs.forEach(linkFromDisplayed => {
-                        const sId = (typeof linkFromDisplayed.source === 'object') ? linkFromDisplayed.source.id : linkFromDisplayed.source;
-                        const tId = (typeof linkFromDisplayed.target === 'object') ? linkFromDisplayed.target.id : linkFromDisplayed.target;
-
-                        let queryKey;
-                        if (isDirected) {
-                            queryKey = `${sId}-${tId}`;
-                        } else {
-                            const ids = [sId, tId].sort();
-                            queryKey = `${ids[0]}-${ids[1]}`;
-                        }
-
-                        if (connectedLinks.has(queryKey)) {
-                            highlightedLinkObjects.push(linkFromDisplayed);
-                        }
-                    });
-                }
-                if (connectedLinks.size > 0) { // Add log even if linksForBfs might be empty
-                    console.log(`LOGGING: Built highlightedLinkObjects with ${highlightedLinkObjects.length} links based on ${connectedLinks.size} keys in connectedLinks.`);
-                }
-
-
-                // Create a thickness scale for the highlighted links.
-                // This will now apply regardless of fullscreen mode.
-                // Using a range like [1.5, 10] to make highlighted links generally a bit thicker.
-                const highlightedThicknessScale = createThicknessScale(highlightedLinkObjects, 1.5, 10);
-
-                let linkLogCounter = 0;
-                const maxLinkLogs = 5;
-                d3.selectAll('.link-group line').each(function(d_link_datum) {
-                    const sourceId = (typeof d_link_datum.source === 'object') ? d_link_datum.source.id : d_link_datum.source;
-                    const targetId = (typeof d_link_datum.target === 'object') ? d_link_datum.target.id : d_link_datum.target;
-                    let logThisLink = linkLogCounter < maxLinkLogs;
-
-                    // Check if this d_link_datum (from the general D3 selection) corresponds to a link in highlightedLinkObjects
-                    const isConnectedLink = highlightedLinkObjects.some(hlo =>
-                        ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === sourceId &&
-                         (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === targetId) ||
-                        // For undirected graphs, the link might be stored reversed in highlightedLinkObjects compared to d_link_datum
-                        (!isDirected && (typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === targetId &&
-                         (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === sourceId)
-                    );
-
-                    if (isConnectedLink) {
-                        if (logThisLink) console.log(`LOGGING: Link ${sourceId}->${targetId} IS CONNECTED. Applying .link-highlighted.`);
-                        d3.select(this)
-                            .classed('link-highlighted', true)
-                            .classed('link-dimmed', false)
-                            .attr('stroke-width', highlightedThicknessScale(d_link_datum.weight));
-                    } else {
-                        if (logThisLink) console.log(`LOGGING: Link ${sourceId}->${targetId} is NOT connected. Applying .link-dimmed.`);
-                        d3.select(this).classed('link-highlighted', false).classed('link-dimmed', true);
-                        // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px !important)
-                        // or could be set explicitly if CSS wasn't !important:
-                        // .attr('stroke-width', 0.5);
-                        // or by the general scale in drawGraph if it's not !important.
-                        // To be safe, ensure it's thin if .link-dimmed CSS doesn't specify width.
-                        // The .link-dimmed class has stroke-width: 0.5px !important, so this is fine.
-                    }
-                    if (logThisLink) linkLogCounter++;
-                });
-                
-                // 更新表格中的高亮
+                // 高亮显示子图
+                drawGraph({nodes: bfsNodes, links: bfsLinks});
+                // 表格高亮
                 document.querySelectorAll('.task-link').forEach(link => {
                     if (link.getAttribute('data-node-id') === nodeId) {
                         link.classList.add('font-bold', 'text-indigo-700');
@@ -1119,42 +950,10 @@
                         link.classList.remove('font-bold', 'text-indigo-700');
                     }
                 });
-                
-                // 更新当前显示的节点数和边数 (Filtered values)
-                filteredNodesValEl.textContent = connectedNodes.size.toLocaleString();
-                filteredEdgesValEl.textContent = connectedLinks.size.toLocaleString();
-                // For switches, sum the weights of the connectedLinks
-                let highlightedSwitchesCount = 0;
-                const allLinksForWeightLookup = currentlyDisplayedLinks; // Or merge fullGraphData.links if original weights needed and not on currentlyDisplayedLinks
-                connectedLinks.forEach(linkKey => {
-                    // linkKey is sourceId-targetId. Need to find the link object to get its weight.
-                    // This is a bit inefficient if linksForBfs is large.
-                    // Consider if connectedLinks should store link objects or if weights need to be summed differently.
-                    // For now, assuming linkKey is sufficient if currentlyDisplayedLinks contains these keys.
-                    const parts = linkKey.split('->'); // Standardized key with '->'
-                    let sourceIdKey = parts[0];
-                    let targetIdKey = parts[1]; // Assuming targetId does not contain '->'
-
-                    // For undirected graphs, keys in allLinksForWeightLookup are sorted alphabetically.
-                    // The linkKey from BFS (based on traversal) might not be, so sort it for lookup.
-                    if (!isDirected) {
-                        const sortedKeys = [sourceIdKey, targetIdKey].sort();
-                        sourceIdKey = sortedKeys[0];
-                        targetIdKey = sortedKeys[1];
-                    }
-
-                    const actualLink = allLinksForWeightLookup.find(l => {
-                        // In allLinksForWeightLookup (derived from formattedLinks), source/target are already IDs.
-                        const lSource = l.source;
-                        const lTarget = l.target;
-                        return (lSource === sourceIdKey && lTarget === targetIdKey);
-                    }
-                    );
-                    if (actualLink) {
-                        highlightedSwitchesCount += actualLink.weight;
-                    }
-                });
-                filteredSwitchesValEl.textContent = highlightedSwitchesCount.toLocaleString();
+                // 更新计数
+                filteredNodesValEl.textContent = bfsNodes.length.toLocaleString();
+                filteredEdgesValEl.textContent = bfsLinks.length.toLocaleString();
+                filteredSwitchesValEl.textContent = bfsLinks.reduce((sum, l) => sum + l.weight, 0).toLocaleString();
             }
 
             function resetGraphFilter() {

@@ -135,32 +135,20 @@
                     </div>
                  </div>
                  <button id="analyzeBtn" class="px-5 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75">Analyze</button>
-                 <button id="resetFilterBtn" class="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75">
-                    <i class="fa fa-refresh mr-1"></i>Reset Filter
-                 </button>
-
                  <div class="h-6 border-l border-gray-300 mx-2"></div>
 
                  <div class="flex items-center space-x-4 text-sm">
                     <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">Nodes:</span>
+                        <span class="font-semibold text-gray-600">Nodes (<span id="displayed-nodes-count">-</span>):</span>
                         <p id="total-nodes" class="font-bold text-indigo-600">-</p>
                     </div>
                     <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">Edges:</span>
+                        <span class="font-semibold text-gray-600">Edges (<span id="displayed-edges-count">-</span>):</span>
                         <p id="total-edges" class="font-bold text-indigo-600">-</p>
                     </div>
                      <div class="flex items-baseline space-x-1.5">
                         <span class="font-semibold text-gray-600">Switches:</span>
                         <p id="total-switches" class="font-bold text-indigo-600">-</p>
-                    </div>
-                    <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">当前显示:</span>
-                        <p id="current-nodes" class="font-bold text-green-600">-</p>
-                    </div>
-                    <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">当前边:</span>
-                        <p id="current-edges" class="font-bold text-green-600">-</p>
                     </div>
                  </div>
 
@@ -168,24 +156,35 @@
 
                  <div id="graph-controls" class="flex flex-wrap items-center space-x-2">
                     <label for="weightThreshold" class="text-sm font-medium text-gray-700 whitespace-nowrap">最小调度次数:</label>
-                    <input type="number" id="weightThreshold" value="1" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <input type="number" id="weightThreshold" value="50" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                     
-                    <label for="graphDirection" class="text-sm font-medium text-gray-700 whitespace-nowrap ml-2">Direct:</label>
-                    <select id="graphDirection" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <select id="graphDirection" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ml-2">
                         <option value="undirected">无向图</option>
                         <option value="directed">有向图</option>
                     </select>
+                    <span class="text-gray-400 mx-1">|</span>
                     
-                    <label for="nodeSearch" class="text-sm font-medium text-gray-700 whitespace-nowrap ml-2">搜索节点:</label>
-                    <input type="text" id="nodeSearch" placeholder="输入节点名称" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <input type="text" id="nodeSearch" placeholder="搜索任务名" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ml-2">
+                    <span class="text-gray-400 mx-1">|</span>
                     
                     <div class="flex items-center ml-2">
-                        <label for="bfsDepth" class="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">BFS深度:</label>
-                        <input type="range" id="bfsDepth" min="1" max="10" value="5" class="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                        <span id="bfsDepthValue" class="ml-2 text-sm font-medium">5</span>
+                        <label for="bfsDepthSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">BFS深度:</label>
+                        <select id="bfsDepthSelect" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5" selected>5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
                     </div>
+                    <span class="text-gray-400 mx-1">|</span>
                     
-                    <div class="flex items-center ml-4">
+                    <div class="flex items-center ml-2"> {/* Adjusted ml-2 from ml-4 for consistent spacing with new separators */}
                         <span class="text-xs font-medium text-gray-600">颜色图例:</span>
                         <div class="flex ml-2">
                             <div class="flex items-center mr-3">
@@ -218,7 +217,12 @@
             </div>
 
             <div class="metric-card lg:w-1/4 table-container">
-                <h2 class="text-lg font-semibold text-gray-700 mb-2 text-center">Filtered Links Table</h2>
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-lg font-semibold text-gray-700 text-center">Filtered Links Table</h2>
+                    <button id="resetFilterBtn" class="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75">
+                       <i class="fa fa-refresh mr-1"></i>Reset Filter
+                    </button>
+                </div>
                 <div class="overflow-x-auto">
                     <table id="links-table" class="w-full text-xs text-left text-gray-500 compact-table">
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50">
@@ -247,8 +251,7 @@
             const weightThresholdInput = document.getElementById('weightThreshold');
             const graphDirectionSelect = document.getElementById('graphDirection');
             const nodeSearchInput = document.getElementById('nodeSearch');
-            const bfsDepthInput = document.getElementById('bfsDepth');
-            const bfsDepthValue = document.getElementById('bfsDepthValue');
+            const bfsDepthSelect = document.getElementById('bfsDepthSelect'); // Changed from bfsDepthInput
             const tooltip = d3.select("#tooltip");
             const placeholder = document.getElementById('placeholder');
             const graphControls = document.getElementById('graph-controls');
@@ -257,8 +260,8 @@
             const totalNodesEl = document.getElementById('total-nodes');
             const totalEdgesEl = document.getElementById('total-edges');
             const totalSwitchesEl = document.getElementById('total-switches');
-            const currentNodesEl = document.getElementById('current-nodes');
-            const currentEdgesEl = document.getElementById('current-edges');
+            const displayedNodesCountEl = document.getElementById('displayed-nodes-count'); // New
+            const displayedEdgesCountEl = document.getElementById('displayed-edges-count'); // New
             const linksTableBody = document.getElementById('links-table-body');
 
             let fullGraphData = { nodes: [], links: [] };
@@ -294,9 +297,8 @@
                 drawGraph();
             }, 300));
             
-            bfsDepthInput.addEventListener('input', () => {
-                bfsDepthValue.textContent = bfsDepthInput.value;
-                console.log(`BFS depth changed to: ${bfsDepthInput.value}`);
+            bfsDepthSelect.addEventListener('change', () => { // Changed from bfsDepthInput to bfsDepthSelect
+                console.log(`BFS depth changed to: ${bfsDepthSelect.value}`);
                 if (currentHighlightedNode) {
                     highlightNodeConnections(currentHighlightedNode);
                 }
@@ -329,8 +331,7 @@
                         
                         placeholder.style.display = 'none';
                         updateMetrics(fullGraphData);
-                        currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
-                        currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
+                        // currentNodesEl and currentEdgesEl are removed, counts updated in drawGraph
                         drawGraph();
                     } else {
                         placeholder.textContent = 'Could not parse data from file. Please check the format.';
@@ -555,6 +556,12 @@
 
                 svg.selectAll("*").remove();
 
+                // Update displayed node and edge counts based on the data *before* simulation
+                // These are the nodes and links that will be attempted to be rendered.
+                displayedNodesCountEl.textContent = nodes.length.toLocaleString();
+                displayedEdgesCountEl.textContent = filteredLinks.length.toLocaleString();
+
+
                 const width = container.clientWidth;
                 const height = container.clientHeight;
 
@@ -596,8 +603,25 @@
 
                 const linkLine = linkGroup.append("line")
                     .attr("stroke", "#999")
-                    .attr("stroke-opacity", 0.6)
-                    .attr("stroke-width", d => Math.min(Math.sqrt(d.weight), 8) * 0.5 + 0.5);
+                    .attr("stroke-opacity", 0.6);
+                    // stroke-width will be set dynamically below
+
+                // Dynamic edge thickness logic
+                if (formattedLinks.length > 0) {
+                    const minWeight = d3.min(formattedLinks, l => l.weight);
+                    const maxWeight = d3.max(formattedLinks, l => l.weight);
+
+                    // Create a scale for stroke width. Adjust range for visual preference.
+                    // Using a linear scale from 1px to 8px. Sqrt scale could also be an option.
+                    const thicknessScale = d3.scaleLinear()
+                                             .domain([minWeight, maxWeight])
+                                             .range([1, 8]) // Min/max stroke width in pixels
+                                             .clamp(true); // Ensure output is within range
+
+                    linkLine.attr("stroke-width", d => thicknessScale(d.weight));
+                } else {
+                    linkLine.attr("stroke-width", 1); // Default if no links or all links have same weight
+                }
                 
                 if (isDirected) {
                     linkLine.attr("marker-end", "url(#arrowhead)");
@@ -715,7 +739,8 @@
             }
 
             function highlightNodeConnections(nodeId) {
-                console.log(`Highlighting connections for node: ${nodeId} with BFS depth: ${bfsDepthInput.value}`);
+                const currentBfsDepth = bfsDepthSelect.value; // Use new select element
+                console.log(`Highlighting connections for node: ${nodeId} with BFS depth: ${currentBfsDepth}`);
                 
                 // 重置之前的高亮状态
                 d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
@@ -730,8 +755,10 @@
                     document.querySelectorAll('.task-link').forEach(link => {
                         link.classList.remove('font-bold', 'text-indigo-700');
                     });
-                    currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
-                    currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
+                    // When un-highlighting, revert to counts from the main drawGraph function
+                    // This typically means re-calling drawGraph or ensuring its last calculated counts are displayed.
+                    // For simplicity here, we'll call drawGraph to reset view and counts.
+                    drawGraph();
                     return;
                 }
                 
@@ -742,7 +769,7 @@
                 // 使用广度优先搜索找到所有连通的节点
                 const isDirected = graphDirectionSelect.value === 'directed';
                 const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
-                const maxDepth = +bfsDepthInput.value;
+                const maxDepth = +bfsDepthSelect.value; // Use new select element's value
                 
                 // BFS初始化
                 const queue = [{id: nodeId, depth: 0}];
@@ -829,31 +856,32 @@
                 });
                 
                 // 更新当前显示的节点数和边数
-                currentNodesEl.textContent = connectedNodes.size.toLocaleString();
-                currentEdgesEl.textContent = connectedLinks.size.toLocaleString();
+                displayedNodesCountEl.textContent = connectedNodes.size.toLocaleString();
+                displayedEdgesCountEl.textContent = connectedLinks.size.toLocaleString();
             }
 
             function resetGraphFilter() {
                 console.log('Resetting graph filter');
                 
-                // 重置高亮状态
-                d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
-                d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
-                d3.selectAll('.node text').classed('highlighted-node-text', false);
+                currentHighlightedNode = null; // Clear any highlighted node state
+                connectedNodes.clear();
+                connectedLinks.clear();
+
+                // Reset input fields to defaults if desired, or simply redraw
+                // weightThresholdInput.value = "50"; // Or initial default
+                // nodeSearchInput.value = "";
+                // graphDirectionSelect.value = "undirected"; // Or initial default
+                // bfsDepthSelect.value = "5"; // Or initial default
+
+                // Redraw the graph with original filters/no filters.
+                // This will also update displayedNodesCountEl and displayedEdgesCountEl.
+                drawGraph();
                 
-                // 重置表格中的高亮
+                // The d3 selections for highlighting are reset within drawGraph or highlightNodeConnections(null)
+                // If drawGraph() doesn't fully reset all visual states (e.g. table highlights), do it here:
                 document.querySelectorAll('.task-link').forEach(link => {
                     link.classList.remove('font-bold', 'text-indigo-700');
                 });
-                
-                // 重置当前高亮节点
-                currentHighlightedNode = null;
-                connectedNodes.clear();
-                connectedLinks.clear();
-                
-                // 重置当前显示的节点数
-                currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
-                currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
             }
 
             function debounce(func, delay) {

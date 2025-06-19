@@ -75,7 +75,7 @@
 
         .link-highlighted {
             stroke: #f59e0b !important;
-            stroke-width: 2px !important;
+            /* stroke-width will be set by JS dynamically or to a fixed value */
             stroke-opacity: 0.8 !important;
         }
 
@@ -134,33 +134,23 @@
                         </span>
                     </div>
                  </div>
-                 <button id="analyzeBtn" class="px-5 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75">Analyze</button>
-                 <button id="resetFilterBtn" class="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75">
-                    <i class="fa fa-refresh mr-1"></i>Reset Filter
-                 </button>
-
                  <div class="h-6 border-l border-gray-300 mx-2"></div>
 
                  <div class="flex items-center space-x-4 text-sm">
                     <div class="flex items-baseline space-x-1.5">
                         <span class="font-semibold text-gray-600">Nodes:</span>
-                        <p id="total-nodes" class="font-bold text-indigo-600">-</p>
+                        <span id="total-nodes-val" class="font-bold text-indigo-600">-</span>
+                        <span class="text-gray-500">(<span id="filtered-nodes-val" class="font-bold text-green-600">-</span>)</span>
                     </div>
                     <div class="flex items-baseline space-x-1.5">
                         <span class="font-semibold text-gray-600">Edges:</span>
-                        <p id="total-edges" class="font-bold text-indigo-600">-</p>
+                        <span id="total-edges-val" class="font-bold text-indigo-600">-</span>
+                        <span class="text-gray-500">(<span id="filtered-edges-val" class="font-bold text-green-600">-</span>)</span>
                     </div>
                      <div class="flex items-baseline space-x-1.5">
                         <span class="font-semibold text-gray-600">Switches:</span>
-                        <p id="total-switches" class="font-bold text-indigo-600">-</p>
-                    </div>
-                    <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">当前显示:</span>
-                        <p id="current-nodes" class="font-bold text-green-600">-</p>
-                    </div>
-                    <div class="flex items-baseline space-x-1.5">
-                        <span class="font-semibold text-gray-600">当前边:</span>
-                        <p id="current-edges" class="font-bold text-green-600">-</p>
+                        <span id="total-switches-val" class="font-bold text-indigo-600">-</span>
+                        <span class="text-gray-500">(<span id="filtered-switches-val" class="font-bold text-green-600">-</span>)</span>
                     </div>
                  </div>
 
@@ -168,40 +158,16 @@
 
                  <div id="graph-controls" class="flex flex-wrap items-center space-x-2">
                     <label for="weightThreshold" class="text-sm font-medium text-gray-700 whitespace-nowrap">最小调度次数:</label>
-                    <input type="number" id="weightThreshold" value="1" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <input type="number" id="weightThreshold" value="50" min="1" class="w-20 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                     
-                    <label for="graphDirection" class="text-sm font-medium text-gray-700 whitespace-nowrap ml-2">Direct:</label>
-                    <select id="graphDirection" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <select id="graphDirection" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ml-2">
                         <option value="undirected">无向图</option>
                         <option value="directed">有向图</option>
                     </select>
+                    <span class="text-gray-400 mx-1">|</span>
                     
-                    <label for="nodeSearch" class="text-sm font-medium text-gray-700 whitespace-nowrap ml-2">搜索节点:</label>
-                    <input type="text" id="nodeSearch" placeholder="输入节点名称" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    
-                    <div class="flex items-center ml-2">
-                        <label for="bfsDepth" class="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">BFS深度:</label>
-                        <input type="range" id="bfsDepth" min="1" max="10" value="5" class="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                        <span id="bfsDepthValue" class="ml-2 text-sm font-medium">5</span>
-                    </div>
-                    
-                    <div class="flex items-center ml-4">
-                        <span class="text-xs font-medium text-gray-600">颜色图例:</span>
-                        <div class="flex ml-2">
-                            <div class="flex items-center mr-3">
-                                <div class="depth-level bg-orange-400"></div>
-                                <span class="text-xs text-gray-600">源节点</span>
-                            </div>
-                            <div class="flex items-center mr-3">
-                                <div class="depth-level bg-yellow-400"></div>
-                                <span class="text-xs text-gray-600">1级节点</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="depth-level bg-green-400"></div>
-                                <span class="text-xs text-gray-600">2+级节点</span>
-                            </div>
-                        </div>
-                    </div>
+                    <input type="text" id="nodeSearch" placeholder="搜索任务名" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ml-2">
+                    {/* BFS Depth and Color Legend moved to the right-hand card */}
                 </div>
              </div>
         </div>
@@ -214,11 +180,48 @@
                     </div>
                     <svg id="graph-svg"></svg>
                     <div id="tooltip"></div>
+                    <button id="fullscreen-toggle" class="absolute top-2 right-2 z-10 p-1.5 bg-gray-700 bg-opacity-50 text-white rounded hover:bg-opacity-75 text-xs">
+                        [ ]
+                    </button>
                 </div>
             </div>
 
-            <div class="metric-card lg:w-1/4 table-container">
-                <h2 class="text-lg font-semibold text-gray-700 mb-2 text-center">Filtered Links Table</h2>
+            <div class="metric-card lg:w-1/4 table-container p-3"> {/* Added padding to the card */}
+                <div class="flex flex-row items-center justify-between space-x-2 mb-2 pt-1 border-t mt-2"> {/* Single row for controls */}
+                    {/* BFS Depth (compact) */}
+                    <div class="flex items-center">
+                        <label for="bfsDepthSelect" class="text-xs font-medium text-gray-600 mr-1 whitespace-nowrap">BFS:</label>
+                        <select id="bfsDepthSelect" class="p-1 text-xs rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" style="min-width: 45px; max-width:55px;">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5" selected>5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                    {/* Color Legend (compact and horizontal) */}
+                    <div class="flex items-center space-x-1">
+                        <span class="text-xs font-medium text-gray-600 hidden sm:inline">Legend:</span> {/* Hide "Legend:" on very small screens if needed */}
+                        <div class="flex items-center" title="Source Node">
+                            <div class="depth-level bg-orange-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">S</span>
+                        </div>
+                        <div class="flex items-center" title="Level 1">
+                            <div class="depth-level bg-yellow-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">L1</span>
+                        </div>
+                        <div class="flex items-center" title="Level 2+">
+                            <div class="depth-level bg-green-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">L2+</span>
+                        </div>
+                    </div>
+                    {/* Reset Button (compact) */}
+                    <button id="resetFilterBtn" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded shadow-sm hover:bg-gray-300 whitespace-nowrap">
+                       Reset
+                    </button>
+                </div>
                 <div class="overflow-x-auto">
                     <table id="links-table" class="w-full text-xs text-left text-gray-500 compact-table">
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50">
@@ -242,32 +245,41 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const fileInput = document.getElementById('fileInput');
-            const analyzeBtn = document.getElementById('analyzeBtn');
+            // const analyzeBtn = document.getElementById('analyzeBtn'); // Removed
             const resetFilterBtn = document.getElementById('resetFilterBtn');
             const weightThresholdInput = document.getElementById('weightThreshold');
             const graphDirectionSelect = document.getElementById('graphDirection');
             const nodeSearchInput = document.getElementById('nodeSearch');
-            const bfsDepthInput = document.getElementById('bfsDepth');
-            const bfsDepthValue = document.getElementById('bfsDepthValue');
+            const bfsDepthSelect = document.getElementById('bfsDepthSelect'); // Changed from bfsDepthInput
             const tooltip = d3.select("#tooltip");
             const placeholder = document.getElementById('placeholder');
             const graphControls = document.getElementById('graph-controls');
             const graphContainer = document.getElementById('graph-container');
+            const fullscreenToggleBtn = document.getElementById('fullscreen-toggle'); // New
 
-            const totalNodesEl = document.getElementById('total-nodes');
-            const totalEdgesEl = document.getElementById('total-edges');
-            const totalSwitchesEl = document.getElementById('total-switches');
-            const currentNodesEl = document.getElementById('current-nodes');
-            const currentEdgesEl = document.getElementById('current-edges');
+            // Updated selectors for new count display format
+            const totalNodesValEl = document.getElementById('total-nodes-val');
+            const filteredNodesValEl = document.getElementById('filtered-nodes-val');
+            const totalEdgesValEl = document.getElementById('total-edges-val');
+            const filteredEdgesValEl = document.getElementById('filtered-edges-val');
+            const totalSwitchesValEl = document.getElementById('total-switches-val');
+            const filteredSwitchesValEl = document.getElementById('filtered-switches-val');
+
             const linksTableBody = document.getElementById('links-table-body');
 
             let fullGraphData = { nodes: [], links: [] };
             let undirectedGraphData = { nodes: [], links: [] };
-            let currentGraphData = { nodes: [], links: [] };
+            // let currentGraphData = { nodes: [], links: [] }; // This wasn't consistently used; removing to avoid confusion
             let simulation;
             let currentHighlightedNode = null;
             let connectedNodes = new Map();
             let connectedLinks = new Set();
+            let g; // Declare g here for wider scope, will be assigned in drawGraph
+
+            // Global cache for currently rendered graph structure by drawGraph
+            let currentlyDisplayedNodes = [];
+            let currentlyDisplayedLinks = [];
+            let lastZoomTransform = null; // To store zoom state
 
             // 阻止图表容器的滚轮事件冒泡到页面
             graphContainer.addEventListener('wheel', (e) => {
@@ -279,7 +291,8 @@
                 e.preventDefault();
             }, { passive: false });
 
-            analyzeBtn.addEventListener('click', handleAnalysis);
+            // analyzeBtn.addEventListener('click', handleAnalysis); // Removed
+            fileInput.addEventListener('change', handleAnalysis); // Auto-analyze on file change
             resetFilterBtn.addEventListener('click', resetGraphFilter);
             weightThresholdInput.addEventListener('input', () => {
                 console.log(`Weight threshold changed to: ${weightThresholdInput.value}`);
@@ -294,9 +307,8 @@
                 drawGraph();
             }, 300));
             
-            bfsDepthInput.addEventListener('input', () => {
-                bfsDepthValue.textContent = bfsDepthInput.value;
-                console.log(`BFS depth changed to: ${bfsDepthInput.value}`);
+            bfsDepthSelect.addEventListener('change', () => { // Changed from bfsDepthInput to bfsDepthSelect
+                console.log(`BFS depth changed to: ${bfsDepthSelect.value}`);
                 if (currentHighlightedNode) {
                     highlightNodeConnections(currentHighlightedNode);
                 }
@@ -329,8 +341,7 @@
                         
                         placeholder.style.display = 'none';
                         updateMetrics(fullGraphData);
-                        currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
-                        currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
+                        // currentNodesEl and currentEdgesEl are removed, counts updated in drawGraph
                         drawGraph();
                     } else {
                         placeholder.textContent = 'Could not parse data from file. Please check the format.';
@@ -344,11 +355,16 @@
                 reader.readAsText(file);
             }
 
-            function updateMetrics({nodes, links}) {
-                totalNodesEl.textContent = nodes.length.toLocaleString();
-                totalEdgesEl.textContent = links.length.toLocaleString();
-                const totalSwitches = links.reduce((sum, link) => sum + link.weight, 0);
-                totalSwitchesEl.textContent = totalSwitches.toLocaleString();
+            function updateMetrics({nodes, links}) { // This function now sets the "Total" values
+                totalNodesValEl.textContent = nodes.length.toLocaleString();
+                totalEdgesValEl.textContent = links.length.toLocaleString();
+                const totalSwitchesCount = links.reduce((sum, link) => sum + link.weight, 0);
+                totalSwitchesValEl.textContent = totalSwitchesCount.toLocaleString();
+
+                // Initialize filtered counts to dash or 0 when new file is loaded, before first drawGraph
+                filteredNodesValEl.textContent = '-';
+                filteredEdgesValEl.textContent = '-';
+                filteredSwitchesValEl.textContent = '-';
             }
 
             function parseSchedData(text) {
@@ -553,7 +569,24 @@
                 const container = document.getElementById('graph-container');
                 const svg = d3.select("#graph-svg");
 
-                svg.selectAll("*").remove();
+                // Store last transform if available
+                if (g && d3.zoomTransform(svg.node()) !== d3.zoomIdentity) {
+                    lastZoomTransform = d3.zoomTransform(svg.node());
+                }
+
+                svg.selectAll("*").remove(); // This removes 'g' as well
+
+                // Update displayed node and edge counts based on the data *before* simulation
+                // These are the nodes and links that will be attempted to be rendered.
+                filteredNodesValEl.textContent = nodes.length.toLocaleString();
+                filteredEdgesValEl.textContent = filteredLinks.length.toLocaleString();
+                const filteredSwitchesCount = filteredLinks.reduce((sum, link) => sum + link.weight, 0);
+                filteredSwitchesValEl.textContent = filteredSwitchesCount.toLocaleString();
+
+                // Cache the exact nodes and links being rendered for BFS in highlightNodeConnections
+                currentlyDisplayedNodes = [...nodes]; // Store a copy
+                currentlyDisplayedLinks = [...filteredLinks]; // Store a copy
+
 
                 const width = container.clientWidth;
                 const height = container.clientHeight;
@@ -583,10 +616,11 @@
 
                 simulation = d3.forceSimulation(nodes)
                     .force("link", d3.forceLink(formattedLinks).id(d => d.id)
-                        .strength(d => 0.1 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))))
-                    .force("charge", d3.forceManyBody().strength(-400))
+                        .strength(d => 0.08 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))) // Re-introduced dynamic link strength
+                        )
+                    .force("charge", d3.forceManyBody().strength(-500)) // Moderately increased repulsion
                     .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collide", d3.forceCollide().radius(15));
+                    .force("collide", d3.forceCollide().radius(22).strength(0.7)); // Moderately increased collision radius with custom strength
 
                 const linkGroup = g.append("g")
                     .selectAll("g")
@@ -596,8 +630,25 @@
 
                 const linkLine = linkGroup.append("line")
                     .attr("stroke", "#999")
-                    .attr("stroke-opacity", 0.6)
-                    .attr("stroke-width", d => Math.min(Math.sqrt(d.weight), 8) * 0.5 + 0.5);
+                    .attr("stroke-opacity", 0.6);
+                    // stroke-width will be set dynamically below
+
+                // Dynamic edge thickness logic
+                if (formattedLinks.length > 0) {
+                    const minWeight = d3.min(formattedLinks, l => l.weight);
+                    const maxWeight = d3.max(formattedLinks, l => l.weight);
+
+                    // Create a scale for stroke width. Adjust range for visual preference.
+                    // Using a linear scale from 1px to 8px. Sqrt scale could also be an option.
+                    const thicknessScale = d3.scaleLinear()
+                                             .domain([minWeight, maxWeight])
+                                             .range([1, 8]) // Min/max stroke width in pixels
+                                             .clamp(true); // Ensure output is within range
+
+                    linkLine.attr("stroke-width", d => thicknessScale(d.weight));
+                } else {
+                    linkLine.attr("stroke-width", 1); // Default if no links or all links have same weight
+                }
                 
                 if (isDirected) {
                     linkLine.attr("marker-end", "url(#arrowhead)");
@@ -692,6 +743,17 @@
 
                 svg.call(zoom);
 
+                // Apply the stored transform
+                if (lastZoomTransform) {
+                    // svg.call(zoom.transform, lastZoomTransform); //This is the correct way
+                    // For older d3, or if 'g' is the transformed element directly by zoom event:
+                     g.attr('transform', lastZoomTransform.toString());
+                     // To make the zoom behavior aware of this new transform:
+                     d3.select(svg.node()).call(zoom.transform, lastZoomTransform);
+
+                }
+
+
                 simulation.on("tick", () => {
                     linkGroup.select("line")
                         .attr("x1", d => d.source.x)
@@ -715,7 +777,8 @@
             }
 
             function highlightNodeConnections(nodeId) {
-                console.log(`Highlighting connections for node: ${nodeId} with BFS depth: ${bfsDepthInput.value}`);
+                const currentBfsDepth = bfsDepthSelect.value; // Use new select element
+                console.log(`Highlighting connections for node: ${nodeId} with BFS depth: ${currentBfsDepth}`);
                 
                 // 重置之前的高亮状态
                 d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
@@ -730,8 +793,10 @@
                     document.querySelectorAll('.task-link').forEach(link => {
                         link.classList.remove('font-bold', 'text-indigo-700');
                     });
-                    currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
-                    currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
+                    // When un-highlighting, revert to counts from the main drawGraph function
+                    // This typically means re-calling drawGraph or ensuring its last calculated counts are displayed.
+                    // For simplicity here, we'll call drawGraph to reset view and counts.
+                    drawGraph();
                     return;
                 }
                 
@@ -739,47 +804,73 @@
                 connectedNodes.clear();
                 connectedLinks.clear();
                 
-                // 使用广度优先搜索找到所有连通的节点
-                const isDirected = graphDirectionSelect.value === 'directed';
-                const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
-                const maxDepth = +bfsDepthInput.value;
+                const isDirected = graphDirectionSelect.value === 'directed'; // Keep for link directionality if needed in BFS
+                const maxDepth = +bfsDepthSelect.value;
+
+                // Use the cached currently displayed nodes and links for BFS
+                const nodesForBfs = currentlyDisplayedNodes;
+                const linksForBfs = currentlyDisplayedLinks;
+
+                // Check if the selected node for highlighting even exists in the currently displayed nodes.
+                const startNodeInDisplayed = nodesForBfs.find(n => n.id === nodeId);
+                if (!startNodeInDisplayed) {
+                    console.warn(`Node ${nodeId} selected for highlighting but not found in currently displayed nodes. Aborting highlight.`);
+                    // Reset to a clean state if the start node isn't even visible.
+                    // This might happen if filters changed between click and processing, though unlikely with current setup.
+                    d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false).attr('fill', '#4f46e5');
+                    d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
+                    d3.selectAll('.node text').classed('highlighted-node-text', false);
+                    // Ensure counts reflect the current general view if highlight aborts
+                    displayedNodesCountEl.textContent = currentlyDisplayedNodes.length.toLocaleString();
+                    displayedEdgesCountEl.textContent = currentlyDisplayedLinks.length.toLocaleString();
+                    currentHighlightedNode = null; // Clear highlight state
+                    return;
+                }
                 
-                // BFS初始化
                 const queue = [{id: nodeId, depth: 0}];
-                connectedNodes.set(nodeId, 0);
+                connectedNodes.set(nodeId, 0); // Map of {id: depth}
                 
-                // 执行BFS
-                while (queue.length > 0) {
-                    const {id, depth} = queue.shift();
+                let head = 0; // Using simple array queue, head index to simulate shift() for performance
+                while(head < queue.length) {
+                    const {id: currentId, depth: currentDepth} = queue[head++];
                     
-                    // 如果达到最大深度，不再继续扩展
-                    if (depth >= maxDepth) continue;
+                    if (currentDepth >= maxDepth) continue;
                     
-                    // 查找与当前节点相连的所有节点
-                    baseGraphData.links.forEach(link => {
-                        if (link.source === id) {
-                            const neighborId = link.target;
-                            if (!connectedNodes.has(neighborId)) {
-                                connectedNodes.set(neighborId, depth + 1);
-                                connectedLinks.add(`${link.source}-${link.target}`);
-                                queue.push({id: neighborId, depth: depth + 1});
-                            } else {
-                                connectedLinks.add(`${link.source}-${link.target}`);
-                            }
-                        } else if (link.target === id) {
-                            const neighborId = link.source;
-                            if (!connectedNodes.has(neighborId)) {
-                                connectedNodes.set(neighborId, depth + 1);
-                                connectedLinks.add(`${link.source}-${link.target}`);
-                                queue.push({id: neighborId, depth: depth + 1});
-                            } else {
-                                connectedLinks.add(`${link.source}-${link.target}`);
+                    linksForBfs.forEach(link => {
+                        // Ensure link source/target are IDs, not objects, for comparison
+                        const linkSourceId = (typeof link.source === 'object') ? link.source.id : link.source;
+                        const linkTargetId = (typeof link.target === 'object') ? link.target.id : link.target;
+
+                        let neighborId = null;
+
+                        if (linkSourceId === currentId) {
+                            neighborId = linkTargetId;
+                        } else if (!isDirected && linkTargetId === currentId) {
+                            neighborId = linkSourceId;
+                        }
+                        // For directed graphs, if link.target === currentId, it's an incoming link.
+                        // The current BFS explores "outgoing" from nodeId. If "incoming" also desired, logic here would change.
+
+                        if (neighborId) {
+                            // Check if neighbor is in the set of currently displayed nodes
+                            const neighborInDisplayed = nodesForBfs.find(n => n.id === neighborId);
+                            if (!neighborInDisplayed) return; // Skip if neighbor isn't currently visible
+
+                            const linkKey = `${linkSourceId}-${linkTargetId}`; // Canonical key for the link direction in BFS
+
+                            if (!connectedNodes.has(neighborId) || connectedNodes.get(neighborId) > currentDepth + 1) {
+                                connectedNodes.set(neighborId, currentDepth + 1);
+                                queue.push({id: neighborId, depth: currentDepth + 1});
+                                connectedLinks.add(linkKey);
+                            } else if (connectedNodes.has(neighborId) && (connectedNodes.get(neighborId) === currentDepth + 1 || currentDepth < connectedNodes.get(neighborId))) {
+                                // If already visited but this path is shorter or same (for multi-path to same node within depth)
+                                // ensure link is added if it's part of *any* valid path to a connected node
+                                connectedLinks.add(linkKey);
                             }
                         }
                     });
                 }
-                
-                console.log(`Found ${connectedNodes.size} connected nodes with depth limit ${maxDepth}`);
+                console.log(`BFS from ${nodeId} (depth ${maxDepth}) found ${connectedNodes.size} nodes and ${connectedLinks.size} links within the currently displayed graph.`);
                 
                 // 更新节点样式
                 d3.selectAll('.node circle').each(function(d) {
@@ -810,12 +901,72 @@
                 });
                 
                 // 更新边样式
-                d3.selectAll('.link-group line').each(function(d) {
-                    const linkKey = `${d.source.id}-${d.target.id}`;
-                    if (connectedLinks.has(linkKey) || connectedLinks.has(`${d.target.id}-${d.source.id}`)) {
+                const isFullscreenActive = document.fullscreenElement === graphContainer ||
+                                         document.mozFullScreenElement === graphContainer ||
+                                         document.webkitFullscreenElement === graphContainer ||
+                                         document.msFullscreenElement === graphContainer;
+
+                let highlightedLinkObjects = [];
+                if (connectedLinks.size > 0) { // connectedLinks stores keys like "sourceId-targetId" from BFS
+                    linksForBfs.forEach(linkFromDisplayed => { // linksForBfs is currentlyDisplayedLinks
+                        const sourceIdStr = (typeof linkFromDisplayed.source === 'object') ? linkFromDisplayed.source.id : linkFromDisplayed.source;
+                        const targetIdStr = (typeof linkFromDisplayed.target === 'object') ? linkFromDisplayed.target.id : linkFromDisplayed.target;
+
+                        // Check if this link (or its reverse for undirected) was found in BFS path
+                        if (connectedLinks.has(`${sourceIdStr}-${targetIdStr}`) ||
+                            (!isDirected && connectedLinks.has(`${targetIdStr}-${sourceIdStr}`))) {
+                             highlightedLinkObjects.push(linkFromDisplayed);
+                        }
+                    });
+                }
+
+                let localThicknessScale = null;
+                if (isFullscreenActive && highlightedLinkObjects.length > 0) {
+                    const weights = highlightedLinkObjects.map(l => l.weight);
+                    const minHighlightedWeight = d3.min(weights);
+                    const maxHighlightedWeight = d3.max(weights);
+
+                    if (minHighlightedWeight !== undefined && maxHighlightedWeight !== undefined) {
+                         localThicknessScale = d3.scaleLinear()
+                                                 .domain([minHighlightedWeight, maxHighlightedWeight])
+                                                 .range([1.5, 8]) // e.g., min 1.5px, max 8px for highlighted links
+                                                 .clamp(true);
+                        if (minHighlightedWeight === maxHighlightedWeight) { // All highlighted links have same weight
+                            localThicknessScale = () => 4; // Apply a medium fixed thickness, e.g. 4px
+                        }
+                    }
+                }
+
+                d3.selectAll('.link-group line').each(function(d_link_datum) {
+                    const sourceId = (typeof d_link_datum.source === 'object') ? d_link_datum.source.id : d_link_datum.source;
+                    const targetId = (typeof d_link_datum.target === 'object') ? d_link_datum.target.id : d_link_datum.target;
+
+                    let isConnected = false;
+                    // Check if this d_link_datum (from the general D3 selection) corresponds to a link in connectedLinks
+                    // connectedLinks stores keys based on BFS traversal.
+                    // A more robust way is to check if d_link_datum is in highlightedLinkObjects
+                    const thisLinkObject = highlightedLinkObjects.find(hlo =>
+                        ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === sourceId &&
+                         (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === targetId) ||
+                        ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === targetId && // check reverse, D3 data might be one way
+                         (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === sourceId)
+                    );
+                    isConnected = !!thisLinkObject;
+
+
+                    if (isConnected) {
                         d3.select(this).classed('link-highlighted', true).classed('link-dimmed', false);
+                        if (localThicknessScale) { // In fullscreen and scale is available for highlighted links
+                            d3.select(this).attr('stroke-width', localThicknessScale(d_link_datum.weight));
+                        } else { // Not in fullscreen or no scale (e.g. no highlighted links)
+                            d3.select(this).attr('stroke-width', 2.5); // Default fixed highlight thickness (slightly thicker than old 2px)
+                        }
                     } else {
                         d3.select(this).classed('link-highlighted', false).classed('link-dimmed', true);
+                        // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px)
+                        // or by the general scale in drawGraph if it's not !important.
+                        // To be safe, ensure it's thin if .link-dimmed CSS doesn't specify width.
+                        // The .link-dimmed class has stroke-width: 0.5px !important, so this is fine.
                     }
                 });
                 
@@ -828,32 +979,56 @@
                     }
                 });
                 
-                // 更新当前显示的节点数和边数
-                currentNodesEl.textContent = connectedNodes.size.toLocaleString();
-                currentEdgesEl.textContent = connectedLinks.size.toLocaleString();
+                // 更新当前显示的节点数和边数 (Filtered values)
+                filteredNodesValEl.textContent = connectedNodes.size.toLocaleString();
+                filteredEdgesValEl.textContent = connectedLinks.size.toLocaleString();
+                // For switches, sum the weights of the connectedLinks
+                let highlightedSwitchesCount = 0;
+                const allLinksForWeightLookup = currentlyDisplayedLinks; // Or merge fullGraphData.links if original weights needed and not on currentlyDisplayedLinks
+                connectedLinks.forEach(linkKey => {
+                    // linkKey is sourceId-targetId. Need to find the link object to get its weight.
+                    // This is a bit inefficient if linksForBfs is large.
+                    // Consider if connectedLinks should store link objects or if weights need to be summed differently.
+                    // For now, assuming linkKey is sufficient if currentlyDisplayedLinks contains these keys.
+                    const parts = linkKey.split('-');
+                    const sourceId = parts[0]; // This assumes no hyphens in IDs themselves
+                    const targetId = parts.slice(1).join('-'); // To handle hyphens in target ID
+
+                    const actualLink = allLinksForWeightLookup.find(l =>
+                        ((typeof l.source === 'object' ? l.source.id : l.source) === sourceId &&
+                         (typeof l.target === 'object' ? l.target.id : l.target) === targetId) ||
+                        (!isDirected && (typeof l.source === 'object' ? l.source.id : l.source) === targetId &&
+                         (typeof l.target === 'object' ? l.target.id : l.target) === sourceId) // check reverse for undirected
+                    );
+                    if (actualLink) {
+                        highlightedSwitchesCount += actualLink.weight;
+                    }
+                });
+                filteredSwitchesValEl.textContent = highlightedSwitchesCount.toLocaleString();
             }
 
             function resetGraphFilter() {
                 console.log('Resetting graph filter');
                 
-                // 重置高亮状态
-                d3.selectAll('.node circle').classed('node-highlighted', false).classed('node-dimmed', false);
-                d3.selectAll('.link-group line').classed('link-highlighted', false).classed('link-dimmed', false);
-                d3.selectAll('.node text').classed('highlighted-node-text', false);
+                currentHighlightedNode = null; // Clear any highlighted node state
+                connectedNodes.clear();
+                connectedLinks.clear();
+
+                // Reset input fields to defaults if desired, or simply redraw
+                // weightThresholdInput.value = "50"; // Or initial default
+                // nodeSearchInput.value = "";
+                // graphDirectionSelect.value = "undirected"; // Or initial default
+                // bfsDepthSelect.value = "5"; // Or initial default
+
+                // Redraw the graph with original filters/no filters.
+                // This will also update displayedNodesCountEl and displayedEdgesCountEl.
+                drawGraph();
                 
-                // 重置表格中的高亮
+                // The d3 selections for highlighting are reset within drawGraph or highlightNodeConnections(null)
+                // If drawGraph() doesn't fully reset all visual states (e.g. table highlights), do it here:
                 document.querySelectorAll('.task-link').forEach(link => {
                     link.classList.remove('font-bold', 'text-indigo-700');
                 });
-                
-                // 重置当前高亮节点
-                currentHighlightedNode = null;
-                connectedNodes.clear();
-                connectedLinks.clear();
-                
-                // 重置当前显示的节点数
-                currentNodesEl.textContent = fullGraphData.nodes.length.toLocaleString();
-                currentEdgesEl.textContent = fullGraphData.links.length.toLocaleString();
             }
 
             function debounce(func, delay) {
@@ -865,6 +1040,82 @@
                     timeout = setTimeout(() => func.apply(context, args), delay);
                 };
             }
+
+            // Fullscreen API handling
+            function toggleFullscreen() {
+                if (!document.fullscreenElement &&
+                    !document.mozFullScreenElement &&
+                    !document.webkitFullscreenElement &&
+                    !document.msFullscreenElement) { // Not in fullscreen
+                    if (graphContainer.requestFullscreen) {
+                        graphContainer.requestFullscreen();
+                    } else if (graphContainer.mozRequestFullScreen) { /* Firefox */
+                        graphContainer.mozRequestFullScreen();
+                    } else if (graphContainer.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                        graphContainer.webkitRequestFullscreen();
+                    } else if (graphContainer.msRequestFullscreen) { /* IE/Edge */
+                        graphContainer.msRequestFullscreen();
+                    }
+                } else { // In fullscreen
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.mozCancelFullScreen) { /* Firefox */
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) { /* IE/Edge */
+                        document.msExitFullscreen();
+                    }
+                }
+            }
+
+            fullscreenToggleBtn.addEventListener('click', toggleFullscreen);
+
+            function updateFullscreenButton() {
+                const isGraphFullscreen = document.fullscreenElement === graphContainer ||
+                                       document.mozFullScreenElement === graphContainer ||
+                                       document.webkitFullscreenElement === graphContainer ||
+                                       document.msFullscreenElement === graphContainer;
+                if (isGraphFullscreen) {
+                    fullscreenToggleBtn.textContent = 'X'; // Exit fullscreen icon
+                } else {
+                    fullscreenToggleBtn.textContent = '[ ]'; // Enter fullscreen icon
+                }
+                return isGraphFullscreen;
+            }
+
+            function handleFullscreenChange() {
+                const isGraphNowFullscreen = updateFullscreenButton();
+                console.log("Fullscreen state changed. Graph is fullscreen:", isGraphNowFullscreen);
+
+                // Trigger a redraw to adapt to new dimensions
+                if (fullGraphData.nodes && fullGraphData.nodes.length > 0) {
+                    setTimeout(() => {
+                        // If drawGraph reinitializes simulation, that's fine.
+                        // If it doesn't, we might need to update forces here.
+                        // drawGraph() already recalculates width/height and re-centers.
+                        drawGraph();
+
+                        // Ensure simulation adapts if it's already running
+                        if (simulation && simulation.nodes().length > 0) {
+                             const newWidth = graphContainer.clientWidth;
+                             const newHeight = graphContainer.clientHeight;
+                             simulation.force("center", d3.forceCenter(newWidth / 2, newHeight / 2));
+                             // simulation.alpha(0.3).restart(); // Reheat simulation may or may not be desired on every resize
+                        }
+                        console.log("Graph redraw triggered due to fullscreen change.");
+                    }, 150); // Delay to allow DOM to settle
+                }
+            }
+
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+            // Initial button state update
+            updateFullscreenButton();
+
         });
     </script>
 </body>

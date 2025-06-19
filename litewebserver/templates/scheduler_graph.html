@@ -316,6 +316,39 @@
             }
 
 
+            // Helper function to create a thickness scale for links
+            function createThicknessScale(linksData, minPx = 1, maxPx = 8) {
+                if (!linksData || linksData.length === 0) {
+                    return () => (minPx + maxPx) / 2; // Default for empty link sets
+                }
+
+                const weights = linksData.map(l => l.weight).filter(w => w > 0); // Filter out non-positive weights for scale domain
+
+                if (weights.length === 0) { // All links had zero or negative weight or were filtered
+                    return () => minPx; // Default to minPx if no positive weights
+                }
+
+                const minWeight = d3.min(weights);
+                const maxWeight = d3.max(weights);
+
+                // This case should ideally be caught by weights.length === 0 if min/max are undefined
+                if (minWeight === undefined || maxWeight === undefined) {
+                    return () => (minPx + maxPx) / 2;
+                }
+
+                if (minWeight === maxWeight) {
+                    // If all positive weights are the same, use a thickness in the middle of the range.
+                    return () => (minPx + maxPx) / 2;
+                }
+
+                // Use d3.scaleSqrt for better visual distinction of weights.
+                return d3.scaleSqrt()
+                         .domain([minWeight, maxWeight])
+                         .range([minPx, maxPx])
+                         .clamp(true);
+            }
+
+
             // 阻止图表容器的滚轮事件冒泡到页面
             graphContainer.addEventListener('wheel', (e) => {
                 if (e.ctrlKey) {
@@ -974,6 +1007,7 @@
                 nodesByDepth.forEach((nodesInLevel, depth) => {
                     const targetY = initialOffsetY + depth * levelHeight;
                     const numNodesInLevel = nodesInLevel.length;
+
                     const nodeVisualRadius = 8; // Actual node radius
                     const minNodeSpacing = 16; // Desired minimum space between node edges (e.g., one diameter)
 
@@ -1007,7 +1041,29 @@
                         if (depth === 0) fillColor = '#f59e0b'; // Source
                         else if (depth === 1) fillColor = '#eab308'; // Level 1
                         else fillColor = '#22c55e'; // Level 2+
+
                         
+                        node.fx = targetX;
+                        node.fy = targetY;
+                    });
+                });
+
+                // Reheat simulation slightly to let links adjust to new fixed positions
+                if (simulation) {
+                    simulation.alpha(0.1).restart();
+                }
+
+
+                // Update node visual styles (colors, sizes)
+                d3.selectAll('.node circle').each(function(d_node) { // d_node is the datum from D3
+                    const isConnected = connectedNodes.has(d_node.id);
+                    if (isConnected) {
+                        const depth = connectedNodes.get(d_node.id);
+                        let fillColor;
+                        if (depth === 0) fillColor = '#f59e0b'; // Source
+                        else if (depth === 1) fillColor = '#eab308'; // Level 1
+                        else fillColor = '#22c55e'; // Level 2+
+
                         d3.select(this)
                             .attr('fill', fillColor)
                             .classed('node-highlighted', true)

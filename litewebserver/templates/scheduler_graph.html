@@ -648,9 +648,10 @@
                         cellSwitches.className = 'px-3 py-2 font-semibold text-indigo-600 text-right';
                     });
 
-                    // 为任务链接添加点击事件
+                    // 只保留 .task-link 的 click 事件
                     document.querySelectorAll('.task-link').forEach(link => {
                         link.addEventListener('click', (e) => {
+                            e.stopPropagation(); // 防止冒泡
                             const nodeId = e.currentTarget.getAttribute('data-node-id');
                             highlightNodeConnections(nodeId);
                         });
@@ -1087,69 +1088,69 @@
             updateFullscreenButton();
 
             // --- Task 1: Edge Highlighting from Table Click ---
-            linksTableBody.addEventListener('click', function(event) {
+            // linksTableBody.addEventListener('click', function(event) {
 
-                const clickedTaskLink = event.target.closest('.task-link');
-                const clickedSwitchesValue = event.target.closest('.switches-value');
-                const targetRow = event.target.closest('tr');
+            //     const clickedTaskLink = event.target.closest('.task-link');
+            //     const clickedSwitchesValue = event.target.closest('.switches-value');
+            //     const targetRow = event.target.closest('tr');
 
-                if (!targetRow) return; // Clicked outside of any row context
+            //     if (!targetRow) return; // Clicked outside of any row context
 
-                // Clear all previous table row highlights first.
-                // This ensures that if a deselect happens, no rows remain highlighted from previous state.
-                document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
+            //     // Clear all previous table row highlights first.
+            //     // This ensures that if a deselect happens, no rows remain highlighted from previous state.
+            //     document.querySelectorAll('#links-table-body tr').forEach(row => row.classList.remove('bg-indigo-100'));
 
-                if (clickedTaskLink) {
-                    const nodeId = clickedTaskLink.getAttribute('data-node-id');
-                    console.log(`Table Event: Task link clicked for node ID: ${nodeId}`);
+            //     if (clickedTaskLink) {
+            //         const nodeId = clickedTaskLink.getAttribute('data-node-id');
+            //         console.log(`Table Event: Task link clicked for node ID: ${nodeId}`);
 
-                    // If a single specific link was highlighted from table (not BFS), clear that visual state.
-                    // highlightNodeConnections will take over for BFS display.
-                    if (highlightedLinkFromTable) {
-                        updateGraphForTableLinkHighlight(true); // true to clear only, sets highlightedLinkFromTable = null
-                    }
+            //         // If a single specific link was highlighted from table (not BFS), clear that visual state.
+            //         // highlightNodeConnections will take over for BFS display.
+            //         if (highlightedLinkFromTable) {
+            //             updateGraphForTableLinkHighlight(true); // true to clear only, sets highlightedLinkFromTable = null
+            //         }
 
-                    // Delegate all selection/deselection logic to highlightNodeConnections.
-                    // This function already handles toggling, setting currentHighlightedNode,
-                    // and updating task-link bolding.
-                    highlightNodeConnections(nodeId);
+            //         // Delegate all selection/deselection logic to highlightNodeConnections.
+            //         // This function already handles toggling, setting currentHighlightedNode,
+            //         // and updating task-link bolding.
+            //         highlightNodeConnections(nodeId);
 
-                    // After highlightNodeConnections, currentHighlightedNode is either nodeId (if selected) or null (if deselected).
-                    // Re-apply highlight to the clicked row ONLY if the node ended up being selected.
-                    if (currentHighlightedNode === nodeId && targetRow) {
-                        targetRow.classList.add('bg-indigo-100');
-                    }
-                    // Note: The bolding of the .task-link text itself is handled within highlightNodeConnections.
+            //         // After highlightNodeConnections, currentHighlightedNode is either nodeId (if selected) or null (if deselected).
+            //         // Re-apply highlight to the clicked row ONLY if the node ended up being selected.
+            //         if (currentHighlightedNode === nodeId && targetRow) {
+            //             targetRow.classList.add('bg-indigo-100');
+            //         }
+            //         // Note: The bolding of the .task-link text itself is handled within highlightNodeConnections.
 
-                } else if (clickedSwitchesValue) {
-                    const sourceId = targetRow.getAttribute('data-source-id');
-                    const targetId = targetRow.getAttribute('data-target-id');
-                    const weight = targetRow.getAttribute('data-weight');
+            //     } else if (clickedSwitchesValue) {
+            //         const sourceId = targetRow.getAttribute('data-source-id');
+            //         const targetId = targetRow.getAttribute('data-target-id');
+            //         const weight = targetRow.getAttribute('data-weight');
 
-                    if (!sourceId || !targetId) {
-                        console.warn("Row for switches click missing source/target ID.");
-                        return;
-                    }
-                    console.log(`Table Event: Switches value clicked for edge: ${sourceId} -> ${targetId}, Weight: ${weight}`);
+            //         if (!sourceId || !targetId) {
+            //             console.warn("Row for switches click missing source/target ID.");
+            //             return;
+            //         }
+            //         console.log(`Table Event: Switches value clicked for edge: ${sourceId} -> ${targetId}, Weight: ${weight}`);
 
-                    // If a BFS highlight is active, reset it before highlighting a single edge.
-                    if (currentHighlightedNode) {
-                        resetGraphFilter();
-                    }
+            //         // If a BFS highlight is active, reset it before highlighting a single edge.
+            //         if (currentHighlightedNode) {
+            //             resetGraphFilter();
+            //         }
 
-                    highlightedLinkFromTable = { sourceId, targetId, weight: parseInt(weight) };
-                    updateGraphForTableLinkHighlight(); // Apply single edge highlight styles in the graph.
+            //         highlightedLinkFromTable = { sourceId, targetId, weight: parseInt(weight) };
+            //         updateGraphForTableLinkHighlight(); // Apply single edge highlight styles in the graph.
 
-                    if (targetRow) { // Highlight the clicked row in the table.
-                        targetRow.classList.add('bg-indigo-100');
-                    }
+            //         if (targetRow) { // Highlight the clicked row in the table.
+            //             targetRow.classList.add('bg-indigo-100');
+            //         }
 
-                } else {
-                    // Clicked on a row but not on a specific interactive element (task-link or switches-value)
-                    console.log("Table Event: Clicked on table row padding or non-specific area.");
-                    // No action needed here, row highlights were already cleared.
-                }
-            });
+            //     } else {
+            //         // Clicked on a row but not on a specific interactive element (task-link or switches-value)
+            //         console.log("Table Event: Clicked on table row padding or non-specific area.");
+            //         // No action needed here, row highlights were already cleared.
+            //     }
+            // });
 
             function updateGraphForTableLinkHighlight(clearOnly = false) {
                 if (!simulation || !simulation.nodes() || !g) {

@@ -167,7 +167,6 @@
                     <span class="text-gray-400 mx-1">|</span>
                     
                     <input type="text" id="nodeSearch" placeholder="搜索任务名" class="w-40 p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ml-2">
-                    {/* BFS Depth and Color Legend moved to the right-hand card */}
                 </div>
              </div>
         </div>
@@ -186,9 +185,9 @@
                 </div>
             </div>
 
-            <div class="metric-card lg:w-1/4 table-container p-3"> {/* Added padding to the card */}
-                <div class="flex flex-row items-center justify-between space-x-2 mb-2 pt-1 border-t mt-2"> {/* Single row for controls */}
-                    {/* BFS Depth (compact) */}
+            <div class="metric-card lg:w-1/4 table-container p-3">
+                <div class="flex flex-row items-center justify-between space-x-2 mb-2 pt-1 border-t mt-2"> 
+
                     <div class="flex items-center">
                         <label for="bfsDepthSelect" class="text-xs font-medium text-gray-600 mr-1 whitespace-nowrap">BFS:</label>
                         <select id="bfsDepthSelect" class="p-1 text-xs rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" style="min-width: 45px; max-width:55px;">
@@ -204,9 +203,8 @@
                             <option value="10">10</option>
                         </select>
                     </div>
-                    {/* Color Legend (compact and horizontal) */}
                     <div class="flex items-center space-x-1">
-                        <span class="text-xs font-medium text-gray-600 hidden sm:inline">Legend:</span> {/* Hide "Legend:" on very small screens if needed */}
+                        <span class="text-xs font-medium text-gray-600 hidden sm:inline">Legend:</span> 
                         <div class="flex items-center" title="Source Node">
                             <div class="depth-level bg-orange-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">S</span>
                         </div>
@@ -217,7 +215,7 @@
                             <div class="depth-level bg-green-400 w-2.5 h-2.5"></div> <span class="text-xs text-gray-500 ml-0.5 hidden md:inline">L2+</span>
                         </div>
                     </div>
-                    {/* Reset Button (compact) */}
+
                     <button id="resetFilterBtn" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded shadow-sm hover:bg-gray-300 whitespace-nowrap">
                        Reset
                     </button>

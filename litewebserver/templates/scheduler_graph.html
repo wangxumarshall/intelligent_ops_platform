@@ -48,7 +48,7 @@
         }
 
         .arrowhead {
-            fill: #999;
+            fill: #333; /* Changed for better visibility */
         }
 
         .table-container {
@@ -281,6 +281,39 @@
             let currentlyDisplayedNodes = [];
             let currentlyDisplayedLinks = [];
             let lastZoomTransform = null; // To store zoom state
+
+            // Helper function to create a thickness scale for links
+            function createThicknessScale(linksData, minPx = 1, maxPx = 8) {
+                if (!linksData || linksData.length === 0) {
+                    return () => (minPx + maxPx) / 2; // Default for empty link sets
+                }
+
+                const weights = linksData.map(l => l.weight).filter(w => w > 0); // Filter out non-positive weights for scale domain
+
+                if (weights.length === 0) { // All links had zero or negative weight or were filtered
+                    return () => minPx; // Default to minPx if no positive weights
+                }
+
+                const minWeight = d3.min(weights);
+                const maxWeight = d3.max(weights);
+
+                // This case should ideally be caught by weights.length === 0 if min/max are undefined
+                if (minWeight === undefined || maxWeight === undefined) {
+                    return () => (minPx + maxPx) / 2;
+                }
+
+                if (minWeight === maxWeight) {
+                    // If all positive weights are the same, use a thickness in the middle of the range.
+                    return () => (minPx + maxPx) / 2;
+                }
+
+                // Use d3.scaleSqrt for better visual distinction of weights.
+                return d3.scaleSqrt()
+                         .domain([minWeight, maxWeight])
+                         .range([minPx, maxPx])
+                         .clamp(true);
+            }
+
 
             // 阻止图表容器的滚轮事件冒泡到页面
             graphContainer.addEventListener('wheel', (e) => {
@@ -571,11 +604,15 @@
                 const svg = d3.select("#graph-svg");
 
                 // Store last transform if available
-                if (g && d3.zoomTransform(svg.node()) !== d3.zoomIdentity) {
-                    lastZoomTransform = d3.zoomTransform(svg.node());
+                // Check if svg.node() exists and is zoomable before getting transform
+                if (svg.node() && typeof d3.zoomTransform === 'function' && svg.node().__zoom !== undefined && svg.node().__zoom !== d3.zoomIdentity) {
+                     if (g) { // Ensure global g was previously defined (e.g. from a previous draw)
+                        lastZoomTransform = d3.zoomTransform(svg.node());
+                     }
                 }
 
-                svg.selectAll("*").remove(); // This removes 'g' as well
+
+                svg.selectAll("*").remove(); // This removes 'g' as well if it was part of svg's children
 
                 // Update displayed node and edge counts based on the data *before* simulation
                 // These are the nodes and links that will be attempted to be rendered.
@@ -592,19 +629,24 @@
                 const width = container.clientWidth;
                 const height = container.clientHeight;
 
-                const g = svg.append("g");
+                g = svg.append("g"); // Assign to the higher-scoped 'g'
 
                 if (isDirected) {
                     svg.append("defs").append("marker")
                         .attr("id", "arrowhead")
-                        .attr("viewBox", "0 0 10 10")
-                        .attr("refX", 9)
-                        .attr("refY", 5)
-                        .attr("markerWidth", 6)
-                        .attr("markerHeight", 6)
-                        .attr("orient", "auto")
+                        // viewBox="0 0 <marker-length> <marker-height>"
+                        .attr("viewBox", "0 0 10 7") // Adjusted viewBox for a 10x7 marker
+                        // refX is distance from node center to the marker's reference point (tip for this path)
+                        // Node radius is 8. We want the tip of the arrow to land near/on the circumference.
+                        // If path tip is at x=10, refX=8 means (8,3.5) of marker is at node center, tip is 2px past center.
+                        .attr("refX", 8)
+                        .attr("refY", 3.5) // Mid-point of marker height 7
+                        .attr("markerWidth", 10) // Visual width of the marker
+                        .attr("markerHeight", 7)  // Visual height of the marker
+                        .attr("orient", "auto") // Corrected: should be "auto" for marker-end
                         .append("path")
-                        .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                        // Path for a 10x7 arrowhead: M0,0 L10,3.5 L0,7
+                        .attr("d", "M 0 0 L 10 3.5 L 0 7 z")
                         .attr("class", "arrowhead");
                 }
 
@@ -635,22 +677,10 @@
                     .attr("stroke-opacity", 0.6);
                     // stroke-width will be set dynamically below
 
-                // Dynamic edge thickness logic
-                if (formattedLinks.length > 0) {
-                    const minWeight = d3.min(formattedLinks, l => l.weight);
-                    const maxWeight = d3.max(formattedLinks, l => l.weight);
-
-                    // Create a scale for stroke width. Adjust range for visual preference.
-                    // Using a linear scale from 1px to 8px. Sqrt scale could also be an option.
-                    const thicknessScale = d3.scaleLinear()
-                                             .domain([minWeight, maxWeight])
-                                             .range([1, 8]) // Min/max stroke width in pixels
-                                             .clamp(true); // Ensure output is within range
-
-                    linkLine.attr("stroke-width", d => thicknessScale(d.weight));
-                } else {
-                    linkLine.attr("stroke-width", 1); // Default if no links or all links have same weight
-                }
+                // Dynamic edge thickness logic using the new helper function
+                // Using a range like [0.8, 10] for general view for potentially finer thin lines and thicker max lines
+                const thicknessScale = createThicknessScale(formattedLinks, 0.8, 10);
+                linkLine.attr("stroke-width", d => thicknessScale(d.weight));
                 
                 if (isDirected) {
                     linkLine.attr("marker-end", "url(#arrowhead)");
@@ -922,50 +952,34 @@
                     });
                 }
 
-                let localThicknessScale = null;
-                if (isFullscreenActive && highlightedLinkObjects.length > 0) {
-                    const weights = highlightedLinkObjects.map(l => l.weight);
-                    const minHighlightedWeight = d3.min(weights);
-                    const maxHighlightedWeight = d3.max(weights);
-
-                    if (minHighlightedWeight !== undefined && maxHighlightedWeight !== undefined) {
-                         localThicknessScale = d3.scaleLinear()
-                                                 .domain([minHighlightedWeight, maxHighlightedWeight])
-                                                 .range([1.5, 8]) // e.g., min 1.5px, max 8px for highlighted links
-                                                 .clamp(true);
-                        if (minHighlightedWeight === maxHighlightedWeight) { // All highlighted links have same weight
-                            localThicknessScale = () => 4; // Apply a medium fixed thickness, e.g. 4px
-                        }
-                    }
-                }
+                // Create a thickness scale for the highlighted links.
+                // This will now apply regardless of fullscreen mode.
+                // Using a range like [1.5, 10] to make highlighted links generally a bit thicker.
+                const highlightedThicknessScale = createThicknessScale(highlightedLinkObjects, 1.5, 10);
 
                 d3.selectAll('.link-group line').each(function(d_link_datum) {
                     const sourceId = (typeof d_link_datum.source === 'object') ? d_link_datum.source.id : d_link_datum.source;
                     const targetId = (typeof d_link_datum.target === 'object') ? d_link_datum.target.id : d_link_datum.target;
 
-                    let isConnected = false;
-                    // Check if this d_link_datum (from the general D3 selection) corresponds to a link in connectedLinks
-                    // connectedLinks stores keys based on BFS traversal.
-                    // A more robust way is to check if d_link_datum is in highlightedLinkObjects
-                    const thisLinkObject = highlightedLinkObjects.find(hlo =>
+                    // Check if this d_link_datum (from the general D3 selection) corresponds to a link in highlightedLinkObjects
+                    const isConnectedLink = highlightedLinkObjects.some(hlo =>
                         ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === sourceId &&
                          (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === targetId) ||
-                        ((typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === targetId && // check reverse, D3 data might be one way
+                        // For undirected graphs, the link might be stored reversed in highlightedLinkObjects compared to d_link_datum
+                        (!isDirected && (typeof hlo.source === 'object' ? hlo.source.id : hlo.source) === targetId &&
                          (typeof hlo.target === 'object' ? hlo.target.id : hlo.target) === sourceId)
                     );
-                    isConnected = !!thisLinkObject;
 
-
-                    if (isConnected) {
-                        d3.select(this).classed('link-highlighted', true).classed('link-dimmed', false);
-                        if (localThicknessScale) { // In fullscreen and scale is available for highlighted links
-                            d3.select(this).attr('stroke-width', localThicknessScale(d_link_datum.weight));
-                        } else { // Not in fullscreen or no scale (e.g. no highlighted links)
-                            d3.select(this).attr('stroke-width', 2.5); // Default fixed highlight thickness (slightly thicker than old 2px)
-                        }
+                    if (isConnectedLink) {
+                        d3.select(this)
+                            .classed('link-highlighted', true)
+                            .classed('link-dimmed', false)
+                            .attr('stroke-width', highlightedThicknessScale(d_link_datum.weight));
                     } else {
                         d3.select(this).classed('link-highlighted', false).classed('link-dimmed', true);
-                        // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px)
+                        // For dimmed links, their stroke-width is determined by .link-dimmed CSS (0.5px !important)
+                        // or could be set explicitly if CSS wasn't !important:
+                        // .attr('stroke-width', 0.5);
                         // or by the general scale in drawGraph if it's not !important.
                         // To be safe, ensure it's thin if .link-dimmed CSS doesn't specify width.
                         // The .link-dimmed class has stroke-width: 0.5px !important, so this is fine.

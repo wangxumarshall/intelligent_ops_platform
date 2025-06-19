@@ -635,18 +635,19 @@
                     svg.append("defs").append("marker")
                         .attr("id", "arrowhead")
                         // viewBox="0 0 <marker-length> <marker-height>"
-                        .attr("viewBox", "0 0 10 7") // Adjusted viewBox for a 10x7 marker
-                        // refX is distance from node center to the marker's reference point (tip for this path)
-                        // Node radius is 8. We want the tip of the arrow to land near/on the circumference.
-                        // If path tip is at x=10, refX=8 means (8,3.5) of marker is at node center, tip is 2px past center.
-                        .attr("refX", 8)
-                        .attr("refY", 3.5) // Mid-point of marker height 7
-                        .attr("markerWidth", 10) // Visual width of the marker
-                        .attr("markerHeight", 7)  // Visual height of the marker
-                        .attr("orient", "auto") // Corrected: should be "auto" for marker-end
+
+                        .attr("viewBox", "0 0 5 3.5") // Adjusted viewBox for a 5x3.5 marker
+                        // refX is distance from node center to the marker's reference point.
+                        // Node radius is 8. Path tip is at x=5. refX=4 means (4,1.75) of marker is at node center.
+                        // Tip (5,1.75) is 1px past node center.
+                        .attr("refX", 4)
+                        .attr("refY", 1.75) // Mid-point of marker height 3.5
+                        .attr("markerWidth", 5) // Visual width of the marker
+                        .attr("markerHeight", 3.5)  // Visual height of the marker
+                        .attr("orient", "auto")
                         .append("path")
-                        // Path for a 10x7 arrowhead: M0,0 L10,3.5 L0,7
-                        .attr("d", "M 0 0 L 10 3.5 L 0 7 z")
+                        // Path for a 5x3.5 arrowhead: M0,0 L5,1.75 L0,3.5
+                        .attr("d", "M 0 0 L 5 1.75 L 0 3.5 z")
                         .attr("class", "arrowhead");
                 }
 
@@ -666,50 +667,6 @@
                     .force("center", d3.forceCenter(width / 2, height / 2))
                     .force("collide", d3.forceCollide().radius(22).strength(0.7)); // Moderately increased collision radius with custom strength
 
-                const linkGroup = g.append("g")
-                    .selectAll("g")
-                    .data(formattedLinks)
-                    .join("g")
-                    .attr("class", "link-group");
-
-                const linkLine = linkGroup.append("line")
-                    .attr("stroke", "#999")
-                    .attr("stroke-opacity", 0.6);
-                    // stroke-width will be set dynamically below
-
-                // Dynamic edge thickness logic using the new helper function
-                // Using a range like [0.8, 10] for general view for potentially finer thin lines and thicker max lines
-                const thicknessScale = createThicknessScale(formattedLinks, 0.8, 10);
-                linkLine.attr("stroke-width", d => thicknessScale(d.weight));
-                
-                if (isDirected) {
-                    linkLine.attr("marker-end", "url(#arrowhead)");
-                }
-
-                linkGroup.append("text")
-                    .text(d => d.weight)
-                    .attr("font-size", "10px")
-                    .attr("font-family", "sans-serif")
-                    .attr("fill", "#333")
-                    .attr("stroke", "white")
-                    .attr("stroke-width", 0.4)
-                    .attr("paint-order", "stroke")
-                    .style("display", "none")
-                    .style("pointer-events", "none");
-
-                linkGroup
-                    .on("mouseover", function(event, d) {
-                        d3.select(this).select('text').style('display', 'block');
-                        tooltip.style("opacity", 1).html(`切换次数: ${d.weight}`);
-                    })
-                    .on("mousemove", (event) => {
-                        tooltip.style("left", (event.pageX + 15) + "px")
-                               .style("top", (event.pageY - 28) + "px");
-                    })
-                    .on("mouseout", function() {
-                        d3.select(this).select('text').style('display', 'none');
-                        tooltip.style("opacity", 0);
-                    });
 
                 const nodeGroup = g.append("g")
                     .selectAll("g")
@@ -766,6 +723,53 @@
                     });
 
                 nodeGroup.call(drag);
+
+                // Now, draw links so they appear on top of nodes.
+                const linkGroup = g.append("g")
+                    .selectAll("g")
+                    .data(formattedLinks)
+                    .join("g")
+                    .attr("class", "link-group");
+
+                const linkLine = linkGroup.append("line")
+                    .attr("stroke", "#999")
+                    .attr("stroke-opacity", 0.6);
+                    // stroke-width will be set dynamically below
+
+                // Dynamic edge thickness logic using the new helper function
+                // Using a range like [0.8, 10] for general view for potentially finer thin lines and thicker max lines
+                const thicknessScale = createThicknessScale(formattedLinks, 0.8, 10);
+                linkLine.attr("stroke-width", d => thicknessScale(d.weight));
+
+                if (isDirected) {
+                    linkLine.attr("marker-end", "url(#arrowhead)");
+                }
+
+                linkGroup.append("text")
+                    .text(d => d.weight)
+                    .attr("font-size", "10px")
+                    .attr("font-family", "sans-serif")
+                    .attr("fill", "#333")
+                    .attr("stroke", "white")
+                    .attr("stroke-width", 0.4)
+                    .attr("paint-order", "stroke")
+                    .style("display", "none")
+                    .style("pointer-events", "none");
+
+                linkGroup
+                    .on("mouseover", function(event, d) {
+                        d3.select(this).select('text').style('display', 'block');
+                        tooltip.style("opacity", 1).html(`切换次数: ${d.weight}`);
+                    })
+                    .on("mousemove", (event) => {
+                        tooltip.style("left", (event.pageX + 15) + "px")
+                               .style("top", (event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function() {
+                        d3.select(this).select('text').style('display', 'none');
+                        tooltip.style("opacity", 0);
+                    });
+
 
                 const zoom = d3.zoom()
                     .scaleExtent([0.1, 10])

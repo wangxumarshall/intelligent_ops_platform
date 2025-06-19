@@ -179,6 +179,9 @@
                     </div>
                     <svg id="graph-svg"></svg>
                     <div id="tooltip"></div>
+                    <button id="fullscreen-toggle" class="absolute top-2 right-2 z-10 p-1.5 bg-gray-700 bg-opacity-50 text-white rounded hover:bg-opacity-75 text-xs">
+                        [ ]
+                    </button>
                 </div>
             </div>
 
@@ -253,6 +256,7 @@
             const placeholder = document.getElementById('placeholder');
             const graphControls = document.getElementById('graph-controls');
             const graphContainer = document.getElementById('graph-container');
+            const fullscreenToggleBtn = document.getElementById('fullscreen-toggle'); // New
 
             // Updated selectors for new count display format
             const totalNodesValEl = document.getElementById('total-nodes-val');
@@ -958,6 +962,82 @@
                     timeout = setTimeout(() => func.apply(context, args), delay);
                 };
             }
+
+            // Fullscreen API handling
+            function toggleFullscreen() {
+                if (!document.fullscreenElement &&
+                    !document.mozFullScreenElement &&
+                    !document.webkitFullscreenElement &&
+                    !document.msFullscreenElement) { // Not in fullscreen
+                    if (graphContainer.requestFullscreen) {
+                        graphContainer.requestFullscreen();
+                    } else if (graphContainer.mozRequestFullScreen) { /* Firefox */
+                        graphContainer.mozRequestFullScreen();
+                    } else if (graphContainer.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                        graphContainer.webkitRequestFullscreen();
+                    } else if (graphContainer.msRequestFullscreen) { /* IE/Edge */
+                        graphContainer.msRequestFullscreen();
+                    }
+                } else { // In fullscreen
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.mozCancelFullScreen) { /* Firefox */
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) { /* IE/Edge */
+                        document.msExitFullscreen();
+                    }
+                }
+            }
+
+            fullscreenToggleBtn.addEventListener('click', toggleFullscreen);
+
+            function updateFullscreenButton() {
+                const isGraphFullscreen = document.fullscreenElement === graphContainer ||
+                                       document.mozFullScreenElement === graphContainer ||
+                                       document.webkitFullscreenElement === graphContainer ||
+                                       document.msFullscreenElement === graphContainer;
+                if (isGraphFullscreen) {
+                    fullscreenToggleBtn.textContent = 'X'; // Exit fullscreen icon
+                } else {
+                    fullscreenToggleBtn.textContent = '[ ]'; // Enter fullscreen icon
+                }
+                return isGraphFullscreen;
+            }
+
+            function handleFullscreenChange() {
+                const isGraphNowFullscreen = updateFullscreenButton();
+                console.log("Fullscreen state changed. Graph is fullscreen:", isGraphNowFullscreen);
+
+                // Trigger a redraw to adapt to new dimensions
+                if (fullGraphData.nodes && fullGraphData.nodes.length > 0) {
+                    setTimeout(() => {
+                        // If drawGraph reinitializes simulation, that's fine.
+                        // If it doesn't, we might need to update forces here.
+                        // drawGraph() already recalculates width/height and re-centers.
+                        drawGraph();
+
+                        // Ensure simulation adapts if it's already running
+                        if (simulation && simulation.nodes().length > 0) {
+                             const newWidth = graphContainer.clientWidth;
+                             const newHeight = graphContainer.clientHeight;
+                             simulation.force("center", d3.forceCenter(newWidth / 2, newHeight / 2));
+                             // simulation.alpha(0.3).restart(); // Reheat simulation may or may not be desired on every resize
+                        }
+                        console.log("Graph redraw triggered due to fullscreen change.");
+                    }, 150); // Delay to allow DOM to settle
+                }
+            }
+
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+            // Initial button state update
+            updateFullscreenButton();
+
         });
     </script>
 </body>

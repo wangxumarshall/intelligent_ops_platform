@@ -872,17 +872,21 @@
                     .style("display", "block") // Default display, will be managed below
                     .each(function(d) { // Adjust text position based on mode
                         if (bfsLayoutInfo) {
+                            // For BFS Subgraph: Text above the node
+                            // Node circle radius in highlightMode (which bfsLayoutInfo implies) is 12.
+                            // Font size in this mode is 10px.
+                            // A y of -18 should place baseline of 10px font comfortably above a circle of radius 12.
                             d3.select(this)
                                 .attr("x", 0) // Centered horizontally
-                                .attr("y", highlightMode ? 20 : 6) // Below node in BFS, adjusted Y
+                                .attr("y", -18) // Position text baseline above the node circle
                                 .attr("text-anchor", "middle");
                         } else {
+                            // For full graph or other modes
                             d3.select(this)
                                 .attr("x", 16) // Original position for non-BFS
                                 .attr("y", 6)
                                 .attr("text-anchor", "start");
                         }
-
                     });
 
                 if (!bfsLayoutInfo) { // Only add mouse events and drag if not in BFS layout mode
@@ -966,6 +970,7 @@
                         });
                     nodeGroup.call(bfsDrag);
                 }
+
 
                 // Now, draw links so they appear on top of nodes.
                 const linkGroup = g.append("g")

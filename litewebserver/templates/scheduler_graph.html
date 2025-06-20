@@ -309,8 +309,9 @@
                     return () => (minPx + maxPx) / 2;
                 }
 
-                // Use d3.scaleSqrt for better visual distinction of weights.
-                return d3.scaleSqrt()
+                // Use d3.scalePow().exponent(3) for thickness proportional to weight^3.
+                return d3.scalePow()
+                         .exponent(3)
                          .domain([minWeight, maxWeight])
                          .range([minPx, maxPx])
                          .clamp(true);
@@ -964,9 +965,7 @@
                             // The node stays where it was dragged.
                         });
                     nodeGroup.call(bfsDrag);
-
                 }
-
 
                 // Now, draw links so they appear on top of nodes.
                 const linkGroup = g.append("g")

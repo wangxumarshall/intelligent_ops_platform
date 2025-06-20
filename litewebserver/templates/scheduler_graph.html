@@ -982,7 +982,13 @@
                 const linkLine = linkGroup.append("line")
                     .attr("stroke", highlightMode ? "#ffd600" : "#999")
                     .attr("stroke-opacity", highlightMode ? 1 : 0.6)
-                    .attr("stroke-width", d => highlightMode ? 6 : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
+                    .attr("stroke-width", d => highlightMode ? (bfsLayoutInfo ? createThicknessScale(formattedLinks, 1.5, 10)(d.weight) : 6) : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
+
+                if (isDirected) {
+                    linkLine.attr("marker-end", "url(#arrowhead)");
+                } else {
+                    linkLine.attr("marker-end", null); // Explicitly remove marker if not directed
+                }
 
                 linkGroup.append("text")
                     .text(d => d.weight)
@@ -1148,25 +1154,15 @@
                 const bfsNodeIds = new Set(connectedNodes.keys());
                 const bfsNodes = thresholdFilteredNodes.filter(n => bfsNodeIds.has(n.id));
 
-                // Filter thresholdFilteredLinks to get actual links in the BFS path
+                // Filter thresholdFilteredLinks to get all links where both source and target nodes are in the bfsNodeIds set.
+                // This ensures all connections between the reachable nodes are shown, not just BFS tree edges.
                 const bfsLinks = thresholdFilteredLinks.filter(link => {
                     const s = typeof link.source === 'object' ? link.source.id : link.source;
                     const t = typeof link.target === 'object' ? link.target.id : link.target;
-                    if (!bfsNodeIds.has(s) || !bfsNodeIds.has(t)) return false;
-
-                    let key;
-                    if (isDirected) {
-                        key = `${s}->${t}`;
-                    } else {
-                        const ids = [s, t].sort();
-                        key = `${ids[0]}->${ids[1]}`;
-                    }
-                    // Additional check: ensure the link was actually traversed and added to connectedLinks
-                    // This is important if multiple links exist between two nodes but only one path was taken by BFS due to depth or prior visit
-                    return connectedLinks.has(key);
+                    return bfsNodeIds.has(s) && bfsNodeIds.has(t);
                 });
 
-                console.log(`[highlightNodeConnections] BFS on thresholded graph: Nodes=${bfsNodes.length}, Links=${bfsLinks.length}`);
+                console.log(`[highlightNodeConnections] BFS on thresholded graph (showing all links between reachable nodes): Nodes=${bfsNodes.length}, Links=${bfsLinks.length}`);
 
                 const bfsDisplayData = {
                     isBfsSubgraph: true,

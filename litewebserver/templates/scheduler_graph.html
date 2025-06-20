@@ -474,11 +474,20 @@
                 const threshold = +weightThresholdInput.value;
                 let nodes, links;
                 let highlightMode = false;
-                if (customData) {
+                let bfsLayoutInfo = null; // To store BFS source and depths
+
+                if (customData && customData.isBfsSubgraph) {
+                    nodes = customData.nodes;
+                    links = customData.links;
+                    bfsLayoutInfo = customData.bfsLayoutInfo; // { sourceNodeId: '...', nodeDepths: Map(...) }
+                    highlightMode = true; // Or a specific mode for BFS layout
+                    console.log('[drawGraph] BFS Subgraph mode:', bfsLayoutInfo, 'nodes:', nodes, 'links:', links);
+                }
+                else if (customData) { // Other custom data, if any (though currently only BFS uses it)
                     nodes = customData.nodes;
                     links = customData.links;
                     highlightMode = true;
-                    console.log('[drawGraph] customData模式: highlightMode=true, nodes:', nodes, 'links:', links);
+                    console.log('[drawGraph] Generic customData mode: highlightMode=true, nodes:', nodes, 'links:', links);
                 } else {
                     if (!fullGraphData.nodes || fullGraphData.nodes.length === 0) {
                         console.log('No graph data available');
@@ -721,9 +730,94 @@
 
                         .strength(d => 0.08 * Math.sqrt(d.weight / (d3.max(formattedLinks, l => l.weight) || 1))) // Re-introduced dynamic link strength
                         )
-                    .force("charge", d3.forceManyBody().strength(-500)) // Moderately increased repulsion
-                    .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collide", d3.forceCollide().radius(22).strength(0.7)); // Moderately increased collision radius with custom strength
+                    .force("charge", d3.forceManyBody().strength(bfsLayoutInfo ? -100 : -500)) // Weaker charge for BFS to rely more on fx/fy
+                    .force("center", bfsLayoutInfo ? null : d3.forceCenter(width / 2, height / 2)) // No centering force for BFS
+                    .force("collide", d3.forceCollide().radius(bfsLayoutInfo ? 30 : 22).strength(0.7)); // Slightly larger collision for BFS if needed
+
+                if (bfsLayoutInfo) {
+                    // Apply hierarchical layout for BFS subgraph
+                    const { sourceNodeId, nodeDepths } = bfsLayoutInfo;
+                    const levels = new Map(); // Map<depth, Array<nodeId>>
+                    let maxDepth = 0;
+
+                    nodes.forEach(node => {
+                        const depth = nodeDepths.get(node.id);
+                        if (depth === undefined) {
+                            console.warn(`Node ${node.id} in BFS subgraph but missing from depth map. Placing at depth 0.`);
+                            // This case should ideally not happen if data is consistent
+                            if (!levels.has(0)) levels.set(0, []);
+                            levels.get(0).push(node.id);
+                            node.depth = 0; // Assign depth for layout
+                        } else {
+                            if (!levels.has(depth)) levels.set(depth, []);
+                            levels.get(depth).push(node.id);
+                            if (depth > maxDepth) maxDepth = depth;
+                            node.depth = depth; // Assign depth for layout
+                        }
+                    });
+
+                    const layerHeight = Math.max(100, (height - 100) / (maxDepth + 1)); // Adjusted layer height, ensure min
+                    const PADDING_X = 50; // Padding from the sides of the SVG
+                    const availableWidth = width - 2 * PADDING_X;
+                    const MAX_NODES_PER_SUB_ROW = 8; // Max nodes before splitting a layer into sub-rows
+                    const SUB_ROW_OFFSET_Y = 60; // Vertical offset for the second sub-row
+
+                    levels.forEach((nodeIdsInLevel, depth) => {
+                        const base_y = 50 + depth * (layerHeight + SUB_ROW_OFFSET_Y / 2); // Adjust layerHeight to account for potential subrows
+                        const numNodesInLevel = nodeIdsInLevel.length;
+
+                        // Sort nodes in the level by ID for consistent layout if split
+                        nodeIdsInLevel.sort();
+
+
+                        const subRows = [];
+                        if (numNodesInLevel > MAX_NODES_PER_SUB_ROW && numNodesInLevel > 1) { // Only split if more than MAX and more than 1 node
+                            // Simple split in half, could be more sophisticated (e.g. by weight)
+                            const splitPoint = Math.ceil(numNodesInLevel / 2);
+                            subRows.push(nodeIdsInLevel.slice(0, splitPoint));
+                            subRows.push(nodeIdsInLevel.slice(splitPoint));
+                        } else {
+                            subRows.push(nodeIdsInLevel);
+                        }
+
+                        subRows.forEach((nodesInSubRow, subRowIndex) => {
+                            const current_y = base_y + subRowIndex * SUB_ROW_OFFSET_Y;
+                            const numNodesInSubRow = nodesInSubRow.length;
+
+                            let estimatedMaxNodeWidth = 150;
+                            if (numNodesInSubRow > 0) {
+                                const sampleNode = nodes.find(n => n.id === nodesInSubRow[0]);
+                                if (sampleNode && sampleNode.comm && sampleNode.pid) {
+                                    estimatedMaxNodeWidth = Math.max(120, (sampleNode.comm.length + sampleNode.pid.length + 5) * 7); // Adjusted estimation
+                                }
+                            }
+                            const nodeSpacingX = Math.max(estimatedMaxNodeWidth + 30, availableWidth / Math.max(1, numNodesInSubRow));
+
+                            nodesInSubRow.forEach((nodeId, index) => {
+                                const node = nodes.find(n => n.id === nodeId);
+                                if (node) {
+                                    const totalWidthOfNodesInSubRow = numNodesInSubRow * nodeSpacingX;
+                                    const startX = PADDING_X + (availableWidth - totalWidthOfNodesInSubRow + nodeSpacingX) / 2;
+                                    node.fx = startX + index * nodeSpacingX;
+                                    node.fy = current_y;
+                                }
+                            });
+                        });
+                    });
+                     // For BFS, stop simulation quickly after initial positioning if nodes have fx/fy
+                    simulation.alpha(0.3).restart(); // Give it a bit of alpha to settle links
+                    setTimeout(() => simulation.stop(), 500); // Stop after a short period
+
+                } else {
+                     // For non-BFS, ensure fx/fy are cleared if they were set by a previous BFS view
+                     nodes.forEach(n => {
+                        // n.fx = null; // This was part of a general reset logic earlier,
+                        // n.fy = null; // ensure it's consistent with how drag behavior sets/unsets fx/fy
+                                     // The drag behavior already nulls fx/fy on dragend for non-BFS.
+                                     // And resetGraphFilter also clears fx/fy.
+                     });
+                }
+
 
                 // Draw nodes first so links (and arrowheads) appear on top.
                 const nodeGroup = g.append("g")
@@ -740,48 +834,82 @@
 
                 nodeGroup.append("text")
                     .text(d => `${d.comm}/${d.pid}`)
-                    .attr("x", 16)
-                    .attr("y", 6)
-                    .attr("font-size", highlightMode ? "16px" : "12px")
+                    .attr("font-size", highlightMode ? (bfsLayoutInfo ? "10px" : "16px") : "12px") // Smaller font for BFS to fit more
                     .attr("font-family", "monospace")
-                    .attr("fill", highlightMode ? "#d32f2f" : "#333")
+                    .attr("fill", highlightMode ? (bfsLayoutInfo ? "#1e3a8a" : "#d32f2f") : "#333")
                     .attr("font-weight", highlightMode ? "bold" : "normal")
-                    .style("display", "block")
-                    .style("pointer-events", "none");
+                    .style("pointer-events", "none")
+                    .style("display", "block") // Default display, will be managed below
+                    .each(function(d) { // Adjust text position based on mode
+                        if (bfsLayoutInfo) {
+                            d3.select(this)
+                                .attr("x", 0) // Centered horizontally
+                                .attr("y", highlightMode ? 20 : 6) // Below node in BFS, adjusted Y
+                                .attr("text-anchor", "middle");
+                        } else {
+                            d3.select(this)
+                                .attr("x", 16) // Original position for non-BFS
+                                .attr("y", 6)
+                                .attr("text-anchor", "start");
+                        }
+                    });
 
-                nodeGroup.on("mouseover", function(event, d) {
-                        d3.select(this).select('text').style('display', 'block');
-                        tooltip.style("opacity", 1).html(`任务: ${d.id}`);
-                    })
-                    .on("mousemove", (event) => {
-                        tooltip.style("left", (event.pageX + 15) + "px")
-                               .style("top", (event.pageY - 28) + "px");
-                    })
-                    .on("mouseout", function() {
-                        d3.select(this).select('text').style('display', 'none');
-                        tooltip.style("opacity", 0);
-                    })
-                    .on("click", function(event, d) {
+                if (!bfsLayoutInfo) { // Only add mouse events and drag if not in BFS layout mode
+                    nodeGroup.on("mouseover", function(event, d) {
+                            d3.select(this).select('text').style('display', 'block');
+                            tooltip.style("opacity", 1).html(`任务: ${d.id}`);
+                        })
+                        .on("mousemove", (event) => {
+                            tooltip.style("left", (event.pageX + 15) + "px")
+                                   .style("top", (event.pageY - 28) + "px");
+                        })
+                        .on("mouseout", function() {
+                            // In normal mode, hide text on mouseout if it wasn't a highlighted node
+                            // For simplicity here, we assume drawGraph sets text display for non-BFS mode
+                            // or rely on a general rule (e.g. only show on hover for non-highlighted)
+                            // The current code shows it if highlightMode is true, which is fine.
+                            // If not highlightMode, it's shown by default.
+                            // Let's stick to: if not highlightMode, text is generally visible or managed by a global show/hide toggle
+                            // For BFS mode, text is always visible.
+                            // The default .style("display", "block") for text ensures it's visible
+                            // unless highlightNodeConnections or other logic explicitly hides it for non-BFS.
+                            // The original code had text display:none then mouseover made it block.
+                            // Now for non-BFS, it's always block.
+                            // Let's revert to original behavior for non-BFS text.
+                            if (!highlightMode) d3.select(this).select('text').style('display', 'none');
+                            tooltip.style("opacity", 0);
+                        })
+                        .on("click", function(event, d) {
+                            highlightNodeConnections(d.id);
+                        });
+
+                    const drag = d3.drag()
+                        .on("start", (event, d) => {
+                            if (!event.active) simulation.alphaTarget(0.3).restart();
+                            d.fx = d.x;
+                            d.fy = d.y;
+                        })
+                        .on("drag", (event, d) => {
+                            d.fx = event.x;
+                            d.fy = event.y;
+                        })
+                        .on("end", (event, d) => {
+                            if (!event.active) simulation.alphaTarget(0);
+                            // For non-BFS mode, allow nodes to be unpinned.
+                            // For BFS mode, positions are fixed by the layout.
+                            d.fx = null;
+                            d.fy = null;
+                        });
+                    nodeGroup.call(drag);
+                } else { // BFS Layout:
+                    // Ensure text is always visible for BFS nodes
+                    nodeGroup.selectAll('text').style('display', 'block');
+                    // Click on a node in BFS view should still allow deselecting/selecting another
+                     nodeGroup.on("click", function(event, d) {
                         highlightNodeConnections(d.id);
                     });
+                }
 
-                const drag = d3.drag()
-                    .on("start", (event, d) => {
-                        if (!event.active) simulation.alphaTarget(0.3).restart();
-                        d.fx = d.x;
-                        d.fy = d.y;
-                    })
-                    .on("drag", (event, d) => {
-                        d.fx = event.x;
-                        d.fy = event.y;
-                    })
-                    .on("end", (event, d) => {
-                        if (!event.active) simulation.alphaTarget(0);
-                        d.fx = null;
-                        d.fy = null;
-                    });
-
-                nodeGroup.call(drag);
 
                 // Now, draw links so they appear on top of nodes.
                 const linkGroup = g.append("g")
@@ -926,6 +1054,8 @@
                 const bfsLinks = linksForBfs.filter(link => {
                     const s = (typeof link.source === 'object') ? link.source.id : link.source;
                     const t = (typeof link.target === 'object') ? link.target.id : link.target;
+                    if (!bfsNodeIds.has(s) || !bfsNodeIds.has(t)) return false; // Ensure both ends of link are in the BFS node set
+
                     let key;
                     if (isDirected) {
                         key = `${s}->${t}`;
@@ -936,8 +1066,20 @@
                     return connectedLinks.has(key);
                 });
                 console.log(`[highlightNodeConnections] BFS子图: bfsNodes.length=${bfsNodes.length}, bfsLinks.length=${bfsLinks.length}`);
+
+                // Prepare data for drawGraph in BFS mode
+                const bfsDisplayData = {
+                    isBfsSubgraph: true,
+                    nodes: bfsNodes,
+                    links: bfsLinks,
+                    bfsLayoutInfo: {
+                        sourceNodeId: nodeId,
+                        nodeDepths: connectedNodes // This map from BFS (nodeId -> depth)
+                    }
+                };
                 // 高亮显示子图
-                drawGraph({nodes: bfsNodes, links: bfsLinks});
+                drawGraph(bfsDisplayData);
+
                 // 表格高亮
                 document.querySelectorAll('.task-link').forEach(link => {
                     if (link.getAttribute('data-node-id') === nodeId) {

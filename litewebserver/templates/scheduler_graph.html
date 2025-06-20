@@ -121,6 +121,13 @@
         <div class="metric-card p-3 mb-4">
              <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                  <div class="flex items-center">
+                    <label for="traceTypeSelect" class="text-sm font-medium text-gray-700 mr-2 whitespace-nowrap">Trace Type:</label>
+                    <select id="traceTypeSelect" class="p-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm mr-3">
+                        <option value="wakeup" selected>任务唤醒 (Task Wakeup)</option>
+                        <option value="sched_switch">调度切换 (Sched Switch)</option>
+                    </select>
+                 </div>
+                 <div class="flex items-center">
                     <input type="file" id="fileInput" accept=".txt,.log" class="block w-full text-sm text-gray-500
                         file:mr-3 file:py-1.5 file:px-3
                         file:rounded-full file:border-0 file:text-sm file:font-semibold
@@ -408,19 +415,50 @@
                 const lines = text.split('\n');
                 const nodeMap = new Map();
                 const linkMap = new Map();
-                const regex = /prev_comm=([\S]+)\s+prev_pid=\d+\s+prev_tid=([\S]+)[\s\S]*?==>\s+next_comm=([\S]+)\s+next_tid=([\S]+)/;
+                const traceType = document.getElementById('traceTypeSelect').value;
+
+                // Define regexes
+                const regex_sched_switch = /prev_comm=([\S]+)\s+prev_pid=\d+\s+prev_tid=([\S]+)[\s\S]*?==>\s+next_comm=([\S]+)\s+next_tid=([\S]+)/;
+                const regex_wakeup = /next_comm=([^\s]+).*?next_tid=(\d+).*?prev_comm=([^\s]+).*?prev_tid=(\d+)/; // Note: pid for wakeup is not directly in this regex, tid is used as pid in node id.
+
+                let currentRegex;
+                let sourceCommIndex, sourceTidIndex, targetCommIndex, targetTidIndex;
+
+                if (traceType === 'sched_switch') {
+                    currentRegex = regex_sched_switch;
+                    // Capture groups for sched_switch: 1:prev_comm, 2:prev_tid, 3:next_comm, 4:next_tid
+                    sourceCommIndex = 1;
+                    sourceTidIndex = 2;
+                    targetCommIndex = 3;
+                    targetTidIndex = 4;
+                    console.log("Parsing with sched_switch regex");
+                } else { // Default to 'wakeup'
+                    currentRegex = regex_wakeup;
+                    // Capture groups for wakeup: 1:next_comm (target), 2:next_tid (target), 3:prev_comm (source), 4:prev_tid (source)
+                    // So, for source (waker): comm is match[3], tid is match[4]
+                    // For target (woken): comm is match[1], tid is match[2]
+                    sourceCommIndex = 3;
+                    sourceTidIndex = 4;
+                    targetCommIndex = 1;
+                    targetTidIndex = 2;
+                    console.log("Parsing with wakeup regex");
+                }
 
                 for (const line of lines) {
-                    const match = line.match(regex);
+                    const match = line.match(currentRegex);
                     if (match) {
-                        const [, prev_comm, prev_tid, next_comm, next_tid] = match;
-                        const sourceId = `${prev_comm}/${prev_tid}`;
-                        const targetId = `${next_comm}/${next_tid}`;
+                        const s_comm = match[sourceCommIndex];
+                        const s_tid = match[sourceTidIndex];
+                        const t_comm = match[targetCommIndex];
+                        const t_tid = match[targetTidIndex];
+
+                        const sourceId = `${s_comm}/${s_tid}`;
+                        const targetId = `${t_comm}/${t_tid}`;
 
                         if (sourceId === targetId) continue;
 
-                        if (!nodeMap.has(sourceId)) nodeMap.set(sourceId, { id: sourceId, comm: prev_comm, pid: prev_tid });
-                        if (!nodeMap.has(targetId)) nodeMap.set(targetId, { id: targetId, comm: next_comm, pid: next_tid });
+                        if (!nodeMap.has(sourceId)) nodeMap.set(sourceId, { id: sourceId, comm: s_comm, pid: s_tid }); // Using tid as pid for simplicity if pid not available
+                        if (!nodeMap.has(targetId)) nodeMap.set(targetId, { id: targetId, comm: t_comm, pid: t_tid }); // Using tid as pid for simplicity
 
                         const linkKey = `${sourceId}->${targetId}`;
 
@@ -981,7 +1019,6 @@
 
                 const linkLine = linkGroup.append("line")
                     .attr("stroke", highlightMode ? "#ffd600" : "#999")
-
                     .attr("stroke-opacity", highlightMode ? 1 : 0.6)
                     .attr("stroke-width", d => highlightMode ? (bfsLayoutInfo ? createThicknessScale(formattedLinks, 1.5, 10)(d.weight) : 6) : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
 
@@ -990,7 +1027,6 @@
                 } else {
                     linkLine.attr("marker-end", null); // Explicitly remove marker if not directed
                 }
-
 
                 linkGroup.append("text")
                     .text(d => d.weight)

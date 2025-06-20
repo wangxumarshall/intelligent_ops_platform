@@ -1040,31 +1040,63 @@
                 }
                 bfsActiveNode = nodeId;
                 currentHighlightedNode = nodeId;
-                const maxDepth = +weightThresholdInput.value;
+                const maxDepth = +bfsDepthSelect.value;
                 const isDirected = graphDirectionSelect.value === 'directed';
+                const currentWeightThreshold = +weightThresholdInput.value;
+
                 const baseGraphData = isDirected ? fullGraphData : undirectedGraphData;
-                const nodesForBfs = baseGraphData.nodes;
-                const linksForBfs = baseGraphData.links;
-                // BFS
-                const queue = [{id: nodeId, depth: 0}];
+
+                // 1. Filter graph by weightThreshold
+                const thresholdFilteredLinks = baseGraphData.links.filter(link => link.weight >= currentWeightThreshold);
+                const nodesInThresholdedGraphIds = new Set();
+                thresholdFilteredLinks.forEach(link => {
+                    nodesInThresholdedGraphIds.add(typeof link.source === 'object' ? link.source.id : link.source);
+                    nodesInThresholdedGraphIds.add(typeof link.target === 'object' ? link.target.id : link.target);
+                });
+                // Ensure the starting node for BFS is part of the thresholded graph, otherwise, no BFS is possible.
+                if (!nodesInThresholdedGraphIds.has(nodeId)) {
+                    console.log(`[highlightNodeConnections] Start node ${nodeId} is not present in the graph after weight threshold ${currentWeightThreshold}. Displaying empty subgraph.`);
+                    drawGraph({ isBfsSubgraph: true, nodes: [], links: [], bfsLayoutInfo: { sourceNodeId: nodeId, nodeDepths: new Map() } });
+                    // Update counts for empty graph
+                    filteredNodesValEl.textContent = '0';
+                    filteredEdgesValEl.textContent = '0';
+                    filteredSwitchesValEl.textContent = '0';
+                     // Clear any existing table highlights for task links if the source node isn't even in the thresholded graph
+                    document.querySelectorAll('.task-link').forEach(link => {
+                        link.classList.remove('font-bold', 'text-indigo-700');
+                    });
+                    return;
+                }
+
+                const thresholdFilteredNodes = baseGraphData.nodes.filter(node => nodesInThresholdedGraphIds.has(node.id));
+
+                // 2. Perform BFS on the threshold-filtered graph
+                connectedNodes.clear(); // Clear from previous selections
+                connectedLinks.clear(); // Clear from previous selections
+                const queue = [{ id: nodeId, depth: 0 }];
                 connectedNodes.set(nodeId, 0);
                 let head = 0;
-                while(head < queue.length) {
-                    const {id: currentId, depth: currentDepth} = queue[head++];
+
+                while (head < queue.length) {
+                    const { id: currentId, depth: currentDepth } = queue[head++];
                     if (currentDepth >= maxDepth) continue;
-                    linksForBfs.forEach(link => {
-                        const linkSourceId = (typeof link.source === 'object') ? link.source.id : link.source;
-                        const linkTargetId = (typeof link.target === 'object') ? link.target.id : link.target;
+
+                    thresholdFilteredLinks.forEach(link => {
+                        const linkSourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                        const linkTargetId = typeof link.target === 'object' ? link.target.id : link.target;
                         let neighborId = null;
-                        if (linkSourceId === currentId) {
+
+                        if (linkSourceId === currentId && nodesInThresholdedGraphIds.has(linkTargetId)) { // Check if target is in thresholded graph
                             neighborId = linkTargetId;
-                        } else if (!isDirected && linkTargetId === currentId) {
+                        } else if (!isDirected && linkTargetId === currentId && nodesInThresholdedGraphIds.has(linkSourceId)) { // Check if source is in thresholded graph
                             neighborId = linkSourceId;
                         }
+
                         if (neighborId) {
                             if (!connectedNodes.has(neighborId) || connectedNodes.get(neighborId) > currentDepth + 1) {
                                 connectedNodes.set(neighborId, currentDepth + 1);
-                                queue.push({id: neighborId, depth: currentDepth + 1});
+                                queue.push({ id: neighborId, depth: currentDepth + 1 });
+                                // Links are added based on traversal path
                                 let key;
                                 if (isDirected) {
                                     key = `${currentId}->${neighborId}`;
@@ -1072,18 +1104,23 @@
                                     const ids = [currentId, neighborId].sort();
                                     key = `${ids[0]}->${ids[1]}`;
                                 }
+                                // We need to ensure this key corresponds to an actual link in thresholdFilteredLinks
+                                // This check is implicitly handled when constructing bfsLinks later using connectedLinks
                                 connectedLinks.add(key);
                             }
                         }
                     });
                 }
-                // 构造子图数据
+
+                // 3. Construct the subgraph from BFS results on the threshold-filtered graph
                 const bfsNodeIds = new Set(connectedNodes.keys());
-                const bfsNodes = nodesForBfs.filter(n => bfsNodeIds.has(n.id));
-                const bfsLinks = linksForBfs.filter(link => {
-                    const s = (typeof link.source === 'object') ? link.source.id : link.source;
-                    const t = (typeof link.target === 'object') ? link.target.id : link.target;
-                    if (!bfsNodeIds.has(s) || !bfsNodeIds.has(t)) return false; // Ensure both ends of link are in the BFS node set
+                const bfsNodes = thresholdFilteredNodes.filter(n => bfsNodeIds.has(n.id));
+
+                // Filter thresholdFilteredLinks to get actual links in the BFS path
+                const bfsLinks = thresholdFilteredLinks.filter(link => {
+                    const s = typeof link.source === 'object' ? link.source.id : link.source;
+                    const t = typeof link.target === 'object' ? link.target.id : link.target;
+                    if (!bfsNodeIds.has(s) || !bfsNodeIds.has(t)) return false;
 
                     let key;
                     if (isDirected) {
@@ -1092,11 +1129,13 @@
                         const ids = [s, t].sort();
                         key = `${ids[0]}->${ids[1]}`;
                     }
+                    // Additional check: ensure the link was actually traversed and added to connectedLinks
+                    // This is important if multiple links exist between two nodes but only one path was taken by BFS due to depth or prior visit
                     return connectedLinks.has(key);
                 });
-                console.log(`[highlightNodeConnections] BFS子图: bfsNodes.length=${bfsNodes.length}, bfsLinks.length=${bfsLinks.length}`);
 
-                // Prepare data for drawGraph in BFS mode
+                console.log(`[highlightNodeConnections] BFS on thresholded graph: Nodes=${bfsNodes.length}, Links=${bfsLinks.length}`);
+
                 const bfsDisplayData = {
                     isBfsSubgraph: true,
                     nodes: bfsNodes,

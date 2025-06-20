@@ -881,6 +881,7 @@
                                 .attr("y", 6)
                                 .attr("text-anchor", "start");
                         }
+
                     });
 
                 if (!bfsLayoutInfo) { // Only add mouse events and drag if not in BFS layout mode
@@ -933,10 +934,37 @@
                 } else { // BFS Layout:
                     // Ensure text is always visible for BFS nodes
                     nodeGroup.selectAll('text').style('display', 'block');
+
                     // Click on a node in BFS view should still allow deselecting/selecting another
-                     nodeGroup.on("click", function(event, d) {
+                    nodeGroup.on("click", function(event, d) {
+                        // If drag event happened, d3 might stop propagation of click.
+                        // Check if it was a drag, if so, maybe don't trigger click?
+                        // For now, standard click behavior.
+                        if (event.defaultPrevented) return; // Drag might prevent default click
                         highlightNodeConnections(d.id);
                     });
+
+                    // Enable dragging for BFS nodes, but they stick where dragged
+                    const bfsDrag = d3.drag()
+                        .on("start", function(event, d) {
+                            if (!event.active && simulation) simulation.alphaTarget(0.1).restart(); // Gentle reheat
+                            d.fx = d.x; // Capture current position to start drag from
+                            d.fy = d.y;
+                            // No need to add class or change appearance on drag start for BFS fixed nodes unless desired
+                        })
+                        .on("drag", function(event, d) {
+                            d.fx = event.x;
+                            d.fy = event.y;
+                            // Update position of the group as it's dragged
+                            d3.select(this).attr("transform", `translate(${d.fx},${d.fy})`);
+                        })
+                        .on("end", function(event, d) {
+                            if (!event.active && simulation) simulation.alphaTarget(0);
+                            // IMPORTANT: For BFS mode, d.fx and d.fy are NOT nulled out.
+                            // The node stays where it was dragged.
+                        });
+                    nodeGroup.call(bfsDrag);
+
                 }
 
 

@@ -976,8 +976,8 @@
 
                 const linkLine = linkGroup.append("line")
                     .attr("stroke", highlightMode ? "#ffd600" : "#999")
-                    .attr("stroke-opacity", highlightMode ? 1 : 0.6)
-                    .attr("stroke-width", d => highlightMode ? 6 : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
+                    .attr("stroke-opacity", highlightMode ? 0.8 : 0.6)
+                    .attr("stroke-width", d => highlightMode ? createThicknessScale(formattedLinks, 0.8, 10)(d.weight) : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
 
                 linkGroup.append("text")
                     .text(d => d.weight)

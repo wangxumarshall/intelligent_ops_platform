@@ -882,6 +882,7 @@
                                 .attr("y", 6)
                                 .attr("text-anchor", "start");
                         }
+
                     });
 
                 if (!bfsLayoutInfo) { // Only add mouse events and drag if not in BFS layout mode
@@ -965,7 +966,6 @@
                         });
                     nodeGroup.call(bfsDrag);
                 }
-
 
                 // Now, draw links so they appear on top of nodes.
                 const linkGroup = g.append("g")

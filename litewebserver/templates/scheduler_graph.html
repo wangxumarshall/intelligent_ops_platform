@@ -872,17 +872,21 @@
                     .style("display", "block") // Default display, will be managed below
                     .each(function(d) { // Adjust text position based on mode
                         if (bfsLayoutInfo) {
+                            // For BFS Subgraph: Text above the node
+                            // Node circle radius in highlightMode (which bfsLayoutInfo implies) is 12.
+                            // Font size in this mode is 10px.
+                            // A y of -18 should place baseline of 10px font comfortably above a circle of radius 12.
                             d3.select(this)
                                 .attr("x", 0) // Centered horizontally
-                                .attr("y", highlightMode ? 20 : 6) // Below node in BFS, adjusted Y
+                                .attr("y", -18) // Position text baseline above the node circle
                                 .attr("text-anchor", "middle");
                         } else {
+                            // For full graph or other modes
                             d3.select(this)
                                 .attr("x", 16) // Original position for non-BFS
                                 .attr("y", 6)
                                 .attr("text-anchor", "start");
                         }
-
                     });
 
                 if (!bfsLayoutInfo) { // Only add mouse events and drag if not in BFS layout mode
@@ -967,6 +971,7 @@
                     nodeGroup.call(bfsDrag);
                 }
 
+
                 // Now, draw links so they appear on top of nodes.
                 const linkGroup = g.append("g")
                     .selectAll("g")
@@ -976,8 +981,16 @@
 
                 const linkLine = linkGroup.append("line")
                     .attr("stroke", highlightMode ? "#ffd600" : "#999")
-                    .attr("stroke-opacity", highlightMode ? 0.8 : 0.6)
-                    .attr("stroke-width", d => highlightMode ? createThicknessScale(formattedLinks, 0.8, 10)(d.weight) : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
+
+                    .attr("stroke-opacity", highlightMode ? 1 : 0.6)
+                    .attr("stroke-width", d => highlightMode ? (bfsLayoutInfo ? createThicknessScale(formattedLinks, 1.5, 10)(d.weight) : 6) : createThicknessScale(formattedLinks, 0.8, 10)(d.weight));
+
+                if (isDirected) {
+                    linkLine.attr("marker-end", "url(#arrowhead)");
+                } else {
+                    linkLine.attr("marker-end", null); // Explicitly remove marker if not directed
+                }
+
 
                 linkGroup.append("text")
                     .text(d => d.weight)
@@ -1143,25 +1156,15 @@
                 const bfsNodeIds = new Set(connectedNodes.keys());
                 const bfsNodes = thresholdFilteredNodes.filter(n => bfsNodeIds.has(n.id));
 
-                // Filter thresholdFilteredLinks to get actual links in the BFS path
+                // Filter thresholdFilteredLinks to get all links where both source and target nodes are in the bfsNodeIds set.
+                // This ensures all connections between the reachable nodes are shown, not just BFS tree edges.
                 const bfsLinks = thresholdFilteredLinks.filter(link => {
                     const s = typeof link.source === 'object' ? link.source.id : link.source;
                     const t = typeof link.target === 'object' ? link.target.id : link.target;
-                    if (!bfsNodeIds.has(s) || !bfsNodeIds.has(t)) return false;
-
-                    let key;
-                    if (isDirected) {
-                        key = `${s}->${t}`;
-                    } else {
-                        const ids = [s, t].sort();
-                        key = `${ids[0]}->${ids[1]}`;
-                    }
-                    // Additional check: ensure the link was actually traversed and added to connectedLinks
-                    // This is important if multiple links exist between two nodes but only one path was taken by BFS due to depth or prior visit
-                    return connectedLinks.has(key);
+                    return bfsNodeIds.has(s) && bfsNodeIds.has(t);
                 });
 
-                console.log(`[highlightNodeConnections] BFS on thresholded graph: Nodes=${bfsNodes.length}, Links=${bfsLinks.length}`);
+                console.log(`[highlightNodeConnections] BFS on thresholded graph (showing all links between reachable nodes): Nodes=${bfsNodes.length}, Links=${bfsLinks.length}`);
 
                 const bfsDisplayData = {
                     isBfsSubgraph: true,

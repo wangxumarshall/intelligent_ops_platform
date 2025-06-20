@@ -766,13 +766,42 @@
                         const base_y = 50 + depth * (layerHeight + SUB_ROW_OFFSET_Y / 2); // Adjust layerHeight to account for potential subrows
                         const numNodesInLevel = nodeIdsInLevel.length;
 
-                        // Sort nodes in the level by ID for consistent layout if split
-                        nodeIdsInLevel.sort();
+                        // Sort nodes in the level by weight if splitting is needed.
+                        if (numNodesInLevel > MAX_NODES_PER_SUB_ROW && numNodesInLevel > 1 && depth > 0) {
+                            const nodesWithWeights = nodeIdsInLevel.map(nodeId => {
+                                let sortWeight = 0;
+                                const nodeDepth = nodeDepths.get(nodeId); // Actual depth of this node
+
+                                // Sum weights of incoming links from the previous layer
+                                links.forEach(link => { // 'links' here are the links of the BFS subgraph
+                                    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                                    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                                    if (targetId === nodeId) {
+                                        const sourceDepth = nodeDepths.get(sourceId);
+                                        if (sourceDepth === nodeDepth - 1) {
+                                            sortWeight += link.weight;
+                                        }
+                                    }
+                                });
+                                return { id: nodeId, weight: sortWeight };
+                            });
+
+                            // Sort by weight (descending), then by ID (ascending) for tie-breaking
+                            nodesWithWeights.sort((a, b) => {
+                                if (b.weight !== a.weight) {
+                                    return b.weight - a.weight;
+                                }
+                                return a.id.localeCompare(b.id);
+                            });
+                            nodeIdsInLevel = nodesWithWeights.map(nw => nw.id); // Update nodeIdsInLevel to be sorted
+                        } else if (numNodesInLevel > 1) {
+                            // Default sort by ID if not splitting by weight (e.g. depth 0 or not enough nodes for weighted split)
+                            nodeIdsInLevel.sort();
+                        }
 
 
                         const subRows = [];
-                        if (numNodesInLevel > MAX_NODES_PER_SUB_ROW && numNodesInLevel > 1) { // Only split if more than MAX and more than 1 node
-                            // Simple split in half, could be more sophisticated (e.g. by weight)
+                        if (numNodesInLevel > MAX_NODES_PER_SUB_ROW && numNodesInLevel > 1) {
                             const splitPoint = Math.ceil(numNodesInLevel / 2);
                             subRows.push(nodeIdsInLevel.slice(0, splitPoint));
                             subRows.push(nodeIdsInLevel.slice(splitPoint));

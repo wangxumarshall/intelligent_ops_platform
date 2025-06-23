@@ -291,6 +291,8 @@
             let highlightedLinkFromTable = null; // For Task 1: Edge Highlighting from Table
             let bfsActiveNode = null; // 新增全局变量
 
+            let comm_pid_tid_list = []; // Stores {comm, pid, tid} for PID/PID_name lookup
+
             // Helper function to create a thickness scale for links
             function createThicknessScale(linksData, minPx = 1, maxPx = 8) {
                 if (!linksData || linksData.length === 0) {
@@ -416,49 +418,103 @@
                 const nodeMap = new Map();
                 const linkMap = new Map();
                 const traceType = document.getElementById('traceTypeSelect').value;
+                comm_pid_tid_list = []; // Reset global list for new parse
+                console.log("comm_pid_tid_list initialized/reset.");
 
                 // Define regexes
-                const regex_sched_switch = /prev_comm=([\S]+)\s+prev_pid=\d+\s+prev_tid=([\S]+)[\s\S]*?==>\s+next_comm=([\S]+)\s+next_tid=([\S]+)/;
-                const regex_wakeup = /next_comm=([^\s]+).*?next_tid=(\d+).*?prev_comm=([^\s]+).*?prev_tid=(\d+)/; // Note: pid for wakeup is not directly in this regex, tid is used as pid in node id.
+                // sched_switch: prev_comm=1 prev_pid=2 prev_tid=3 ==> next_comm=4 next_tid=5
+                const regex_sched_switch = /prev_comm=([\S]+)\s+prev_pid=(\d+)\s+prev_tid=([\S]+)[\s\S]*?==>\s+next_comm=([\S]+)\s+next_tid=([\S]+)/;
+                // wakeup: next_comm=1 next_tid=2 prev_comm=3 prev_tid=4
+                const regex_wakeup = /next_comm=([^\s]+).*?next_tid=(\d+).*?prev_comm=([^\s]+).*?prev_tid=(\d+)/;
 
                 let currentRegex;
-                let sourceCommIndex, sourceTidIndex, targetCommIndex, targetTidIndex;
+                // Indices for extracting s_comm, s_tid, t_comm, t_tid for link creation
+                let s_comm_idx, s_tid_idx, t_comm_idx, t_tid_idx;
+                // Indices for extracting prev_comm, prev_pid, prev_tid for comm_pid_tid_list
+                let line_prev_comm_idx, line_prev_pid_idx, line_prev_tid_idx;
 
                 if (traceType === 'sched_switch') {
                     currentRegex = regex_sched_switch;
-                    // Capture groups for sched_switch: 1:prev_comm, 2:prev_tid, 3:next_comm, 4:next_tid
-                    sourceCommIndex = 1;
-                    sourceTidIndex = 2;
-                    targetCommIndex = 3;
-                    targetTidIndex = 4;
+                    // Groups for sched_switch: 1:prev_comm, 2:prev_pid, 3:prev_tid, 4:next_comm, 5:next_tid
+                    s_comm_idx = 1;         // prev_comm is source for the switch event
+                    s_tid_idx = 3;          // prev_tid is source for the switch event
+                    t_comm_idx = 4;         // next_comm is target for the switch event
+                    t_tid_idx = 5;          // next_tid is target for the switch event
+
+                    line_prev_comm_idx = 1; // prev_comm from the line
+                    line_prev_pid_idx = 2;  // prev_pid from the line
+                    line_prev_tid_idx = 3;  // prev_tid from the line
                     console.log("Parsing with sched_switch regex");
                 } else { // Default to 'wakeup'
                     currentRegex = regex_wakeup;
-                    // Capture groups for wakeup: 1:next_comm (target), 2:next_tid (target), 3:prev_comm (source), 4:prev_tid (source)
-                    // So, for source (waker): comm is match[3], tid is match[4]
-                    // For target (woken): comm is match[1], tid is match[2]
-                    sourceCommIndex = 3;
-                    sourceTidIndex = 4;
-                    targetCommIndex = 1;
-                    targetTidIndex = 2;
+                    // Groups for wakeup: 1:next_comm (target), 2:next_tid (target), 3:prev_comm (source), 4:prev_tid (source)
+                    s_comm_idx = 3;         // prev_comm (waker) is source for wakeup event
+                    s_tid_idx = 4;          // prev_tid (waker) is source for wakeup event
+                    t_comm_idx = 1;         // next_comm (woken) is target for wakeup event
+                    t_tid_idx = 2;          // next_tid (woken) is target for wakeup event
+
+                    line_prev_comm_idx = 3; // This is the 'prev_comm' mentioned in the wakeup log line (the waker)
+                    line_prev_tid_idx = 4;  // This is the 'prev_tid' mentioned in the wakeup log line (the waker's tid)
+                                            // line_prev_pid_idx will be handled specially for wakeup
                     console.log("Parsing with wakeup regex");
                 }
 
                 for (const line of lines) {
                     const match = line.match(currentRegex);
                     if (match) {
-                        const s_comm = match[sourceCommIndex];
-                        const s_tid = match[sourceTidIndex];
-                        const t_comm = match[targetCommIndex];
-                        const t_tid = match[targetTidIndex];
+                        const current_line_prev_comm = match[line_prev_comm_idx];
+                        const current_line_prev_tid = match[line_prev_tid_idx];
+                        let current_line_prev_pid;
 
-                        const sourceId = `${s_comm}/${s_tid}`;
-                        const targetId = `${t_comm}/${t_tid}`;
+                        if (traceType === 'sched_switch') {
+                            current_line_prev_pid = match[line_prev_pid_idx];
+                        } else { // wakeup
+                            // Assumption: For wakeup, if prev_pid is not in logs, use prev_tid as prev_pid.
+                            current_line_prev_pid = current_line_prev_tid; // Placeholder
+                        }
+
+                        // Manage comm_pid_tid_list
+                        // "对每一行数据，记录prev_comm、prev_pid、prev_tid的关系数据"
+                        // "当prev_pid == prev_tid，将comm_pid_tid结构体链表中prev_comm更新为当前的prev_comm。"
+                        // This means we find an entry by prev_tid, and if pid==tid, we update its comm.
+                        // If no entry for prev_tid exists, we add one.
+
+                        let entry = comm_pid_tid_list.find(e => e.tid === current_line_prev_tid);
+                        if (entry) {
+                            // Entry for this TID exists. Update its comm if current line indicates pid==tid.
+                            if (current_line_prev_pid && current_line_prev_tid && current_line_prev_pid.toString() === current_line_prev_tid.toString()) {
+                                entry.comm = current_line_prev_comm;
+                                // It's also possible the PID wasn't known correctly before, so update it too.
+                                entry.pid = current_line_prev_pid;
+                                // console.log(`Updated comm/pid for existing TID ${current_line_prev_tid} to ${current_line_prev_comm}/${current_line_prev_pid} (pid==tid)`);
+                            }
+                            // If it's not a pid==tid case, we don't overwrite the comm, assuming the existing one
+                            // (potentially set by a prior pid==tid or the first encounter) is preferred for that PID.
+                            // We also assume the PID for a given TID doesn't change.
+                        } else {
+                            // No entry for this TID yet, add it.
+                            comm_pid_tid_list.push({
+                                comm: current_line_prev_comm,
+                                pid: current_line_prev_pid,
+                                tid: current_line_prev_tid
+                            });
+                            // console.log(`Added new entry for TID ${current_line_prev_tid}: ${current_line_prev_comm}/${current_line_prev_pid}`);
+                        }
+
+                        // Continue with existing logic for graph nodes and links
+                        const s_comm = match[s_comm_idx];
+                        const s_tid = match[s_tid_idx];
+                        const t_comm = match[t_comm_idx];
+                        const t_tid = match[t_tid_idx];
+
+                        const sourceId = `${s_comm}/${s_tid}`; // Graph node ID uses comm/tid
+                        const targetId = `${t_comm}/${t_tid}`; // Graph node ID uses comm/tid
 
                         if (sourceId === targetId) continue;
 
-                        if (!nodeMap.has(sourceId)) nodeMap.set(sourceId, { id: sourceId, comm: s_comm, pid: s_tid }); // Using tid as pid for simplicity if pid not available
-                        if (!nodeMap.has(targetId)) nodeMap.set(targetId, { id: targetId, comm: t_comm, pid: t_tid }); // Using tid as pid for simplicity
+                        // In graph node objects, 'pid' field actually stores the TID part of the node ID.
+                        if (!nodeMap.has(sourceId)) nodeMap.set(sourceId, { id: sourceId, comm: s_comm, pid: s_tid });
+                        if (!nodeMap.has(targetId)) nodeMap.set(targetId, { id: targetId, comm: t_comm, pid: t_tid });
 
                         const linkKey = `${sourceId}->${targetId}`;
 
@@ -475,6 +531,8 @@
                 }
 
                 console.log(`Parsed ${nodeMap.size} nodes and ${linkMap.size} links`);
+                console.log("comm_pid_tid_list content:", JSON.stringify(comm_pid_tid_list.slice(0, 20), null, 2)); // Log first 20 entries
+                if(comm_pid_tid_list.length > 20) console.log(`(Plus ${comm_pid_tid_list.length - 20} more entries in comm_pid_tid_list)`);
                 return {
                     nodes: Array.from(nodeMap.values()),
                     links: Array.from(linkMap.values())
@@ -930,7 +988,18 @@
                 if (!bfsLayoutInfo) { // Only add mouse events and drag if not in BFS layout mode
                     nodeGroup.on("mouseover", function(event, d) {
                             d3.select(this).select('text').style('display', 'block');
-                            tooltip.style("opacity", 1).html(`任务: ${d.id}`);
+
+                            // d.id is "comm/tid", d.pid is the "tid" part.
+                            const selectedNodeTid = d.pid; // This is the TID of the hovered graph node.
+                            const pidInfoEntry = comm_pid_tid_list.find(entry => entry.tid === selectedNodeTid);
+
+                            let tooltipHtml = `TID: ${selectedNodeTid}<br>TID Name: ${d.comm}`;
+                            if (pidInfoEntry) {
+                                tooltipHtml += `<br>---<br>PID: ${pidInfoEntry.pid}<br>PID Name: ${pidInfoEntry.comm}`;
+                            } else {
+                                tooltipHtml += `<br>---<br>(PID info not found for this TID)`;
+                            }
+                            tooltip.style("opacity", 1).html(tooltipHtml);
                         })
                         .on("mousemove", (event) => {
                             tooltip.style("left", (event.pageX + 15) + "px")

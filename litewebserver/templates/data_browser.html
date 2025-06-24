@@ -124,6 +124,9 @@
                             <a href="https://rtosdfx.rnd.com/application/?trace={{ url_for('download_file', filepath=item.path, _external=True) }}&link=true" target="_blank">可视分析</a>
                         {% endif %}
                     {% endif %}
+                    {# Add Rename button for both files and directories #}
+                    &nbsp;
+                    <button onclick="promptRename('{{ current_path_display }}', '{{ item.name }}')">Rename</button>
                 </td>
             </tr>
             {% endfor %}
@@ -231,6 +234,39 @@
         .finally(() => {
             // Optional: Re-enable button or hide loading state here
         });
+    }
+
+    function promptRename(currentSubdir, oldName) {
+        const newName = prompt(`Enter new name for "${oldName}":`, oldName);
+        if (newName && newName.trim() !== "") {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ url_for("rename_item") }}'; // Ensure this route is defined in Flask
+
+            const currentSubdirInput = document.createElement('input');
+            currentSubdirInput.type = 'hidden';
+            currentSubdirInput.name = 'current_subdir';
+            currentSubdirInput.value = currentSubdir;
+            form.appendChild(currentSubdirInput);
+
+            const oldNameInput = document.createElement('input');
+            oldNameInput.type = 'hidden';
+            oldNameInput.name = 'old_name';
+            oldNameInput.value = oldName;
+            form.appendChild(oldNameInput);
+
+            const newNameInput = document.createElement('input');
+            newNameInput.type = 'hidden';
+            newNameInput.name = 'new_name';
+            newNameInput.value = newName.trim();
+            form.appendChild(newNameInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        } else if (newName !== null) { // User clicked OK but entered empty string
+            alert("New name cannot be empty.");
+        }
+        // If newName is null, user clicked Cancel, so do nothing.
     }
 </script>
 </body>

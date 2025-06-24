@@ -318,6 +318,76 @@ def create_folder():
 
     return redirect(url_for('browse_files', subpath=current_subdir))
 
+@app.route('/rename_item', methods=['POST'])
+def rename_item():
+    current_subdir = request.form.get('current_subdir', '').strip('/')
+    old_name_raw = request.form.get('old_name', '').strip()
+    new_name_raw = request.form.get('new_name', '').strip()
+
+    # Validate names
+    if not old_name_raw or not new_name_raw:
+        # flash("Old or new name cannot be empty.", "error")
+        print("Error: Old or new name cannot be empty.")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    # Sanitize names
+    # old_name doesn't strictly need secure_filename if it's coming from our listing,
+    # but new_name definitely does.
+    old_name = secure_filename(old_name_raw) # Apply to old_name for consistency and safety
+    new_name = secure_filename(new_name_raw)
+
+    if old_name != old_name_raw or '/' in old_name_raw or '\\' in old_name_raw:
+        print(f"Error: Invalid characters in old name: {old_name_raw}")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    if new_name != new_name_raw or '/' in new_name_raw or '\\' in new_name_raw:
+        # flash("Invalid characters in new name.", "error")
+        print(f"Error: Invalid characters in new name: {new_name_raw}")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    if not new_name: # Handles cases like ".." or "." becoming empty
+        # flash("Invalid new name.", "error")
+        print(f"Error: Invalid new name after sanitization: {new_name_raw}")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    # Construct full paths
+    base_path = app.config['BASE_SERVED_DIR']
+    item_dir_abs = get_path_details(base_path, current_subdir) # Validates and gets abs path of parent dir
+
+    old_item_path_abs = os.path.join(item_dir_abs, old_name)
+    new_item_path_abs = os.path.join(item_dir_abs, new_name)
+
+    # Security check: Ensure old and new paths are within BASE_SERVED_DIR
+    # get_path_details already checks item_dir_abs. We need to ensure new_item_path_abs is also safe.
+    # os.path.abspath is important here for reliable startswith check.
+    if not os.path.abspath(old_item_path_abs).startswith(base_path) or \
+       not os.path.abspath(new_item_path_abs).startswith(base_path):
+        # flash("Invalid path specified for renaming.", "error")
+        print("Error: Invalid path specified for renaming (path escape attempt).")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    # Check if old item exists
+    if not os.path.exists(old_item_path_abs):
+        # flash(f"Item '{old_name}' not found.", "error")
+        print(f"Error: Item '{old_name}' not found at '{old_item_path_abs}'.")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    # Check if new name already exists
+    if os.path.exists(new_item_path_abs):
+        # flash(f"An item named '{new_name}' already exists.", "warning")
+        print(f"Warning: An item named '{new_name}' already exists at '{new_item_path_abs}'.")
+        return redirect(url_for('browse_files', subpath=current_subdir))
+
+    try:
+        os.rename(old_item_path_abs, new_item_path_abs)
+        # flash(f"Item '{old_name}' renamed to '{new_name}' successfully.", "success")
+        print(f"Item '{old_item_path_abs}' renamed to '{new_item_path_abs}' successfully.")
+    except OSError as e:
+        # flash(f"Error renaming item: {e.strerror}", "error")
+        print(f"Error renaming item '{old_item_path_abs}' to '{new_item_path_abs}': {e}")
+
+    return redirect(url_for('browse_files', subpath=current_subdir))
+
 # --- Click Logging ---
 @app.route('/log_click', methods=['POST'])
 def log_click():

@@ -448,6 +448,7 @@
                 // New regex for IRQ and sched_wakeup processing
                 const regex_irq = /\[irq\]\[cpu=(\d+)\](?:\[seq=\d+\])?\s+irqno=(\d+)/;
                 const regex_sched_wakeup_detail = /\[sched_wakeup\]\[cpu=(\d+)\]comm=([^\s]+)\s+pid=(\d+)/;
+                const regex_skip_tcb = /tcb='\s+dh-irq-bind-\d+\s+'/; // Matches tcb=' dh-irq-bind-N ' with flexible spacing
 
                 let last_irq_context_per_cpu = {}; // Stores { cpu_id: irq_no }
 
@@ -484,6 +485,12 @@
                 }
 
                 for (const line of lines) {
+                    // Skip line if it contains tcb=' dh-irq-bind-N '
+                    if (regex_skip_tcb.test(line)) {
+                        // console.log(`Skipping line due to tcb dh-irq-bind pattern: ${line}`);
+                        continue;
+                    }
+
                     // IRQ processing logic
                     const irq_match = line.match(regex_irq);
                     if (irq_match) {

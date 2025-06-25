@@ -414,7 +414,25 @@
             }
 
             function parseSchedData(text) {
-                const lines = text.split('\n');
+                let lines = text.split('\n').filter(line => line.trim() !== ''); // Filter out empty lines
+
+                // Helper function to extract timestamp
+                const getTimestamp = (line) => {
+                    const match = line.match(/^\[(\d+\.\d+)\].*/);
+                    if (match) {
+                        return parseFloat(match[1]);
+                    }
+                    return null; // Or handle error/default
+                };
+
+                // Sort lines by timestamp
+                lines.sort((a, b) => {
+                    const tsA = getTimestamp(a);
+                    const tsB = getTimestamp(b);
+                    if (tsA === null || tsB === null) return 0; // Should not happen with valid data
+                    return tsA - tsB;
+                });
+
                 const nodeMap = new Map();
                 const linkMap = new Map();
                 const traceType = document.getElementById('traceTypeSelect').value;
@@ -426,6 +444,12 @@
                 const regex_sched_switch = /prev_comm=([\S]+)\s+prev_pid=(\d+)\s+prev_tid=([\S]+)[\s\S]*?==>\s+next_comm=([\S]+)\s+next_tid=([\S]+)/;
                 // wakeup: next_comm=1 next_tid=2 prev_comm=3 prev_tid=4
                 const regex_wakeup = /next_comm=([^\s]+).*?next_tid=(\d+).*?prev_comm=([^\s]+).*?prev_tid=(\d+)/;
+
+                // New regex for IRQ and sched_wakeup processing
+                const regex_irq = /\[irq\]\[cpu=(\d+)\](?:\[seq=\d+\])?\s+irqno=(\d+)/;
+                const regex_sched_wakeup_detail = /\[sched_wakeup\]\[cpu=(\d+)\]comm=([^\s]+)\s+pid=(\d+)/;
+
+                let last_irq_context_per_cpu = {}; // Stores { cpu_id: irq_no }
 
                 let currentRegex;
                 // Indices for extracting s_comm, s_tid, t_comm, t_tid for link creation
@@ -460,6 +484,59 @@
                 }
 
                 for (const line of lines) {
+                    // IRQ processing logic
+                    const irq_match = line.match(regex_irq);
+                    if (irq_match) {
+                        const irq_cpu_val = irq_match[1];
+                        const irq_no_val = irq_match[2];
+                        last_irq_context_per_cpu[irq_cpu_val] = irq_no_val;
+                        // console.log(`IRQ detected: cpu=${irq_cpu_val}, irqno=${irq_no_val}. Updated context for CPU ${irq_cpu_val}:`, last_irq_context_per_cpu);
+                    }
+
+                    const sched_wakeup_match = line.match(regex_sched_wakeup_detail);
+                    if (sched_wakeup_match) {
+                        const wakeup_cpu = sched_wakeup_match[1];
+                        const wakeup_comm = sched_wakeup_match[2];
+                        const wakeup_pid = sched_wakeup_match[3];
+
+                        const relevant_irq_no = last_irq_context_per_cpu[wakeup_cpu];
+
+                        // console.log(`Sched_wakeup detected: cpu=${wakeup_cpu}, comm=${wakeup_comm}, pid=${wakeup_pid}. IRQ context for this CPU: ${relevant_irq_no}`);
+
+                        if (relevant_irq_no) { // If an IRQ was recorded for this CPU
+                            // console.log(`IRQ-triggered wakeup on CPU ${wakeup_cpu}. Relevant IRQ No for this CPU: ${relevant_irq_no}`);
+                            const source_id = `irqno_${relevant_irq_no}`;
+                            const target_id = `${wakeup_comm}/${wakeup_pid}`;
+
+                            if (!nodeMap.has(source_id)) {
+                                nodeMap.set(source_id, { id: source_id, comm: `irqno_${relevant_irq_no}`, pid: relevant_irq_no });
+                                // console.log(`Added IRQ node: ${source_id}`);
+                            }
+                            if (!nodeMap.has(target_id)) {
+                                nodeMap.set(target_id, { id: target_id, comm: wakeup_comm, pid: wakeup_pid });
+                                // console.log(`Added woken task node (from IRQ context): ${target_id}`);
+                            }
+
+                            const linkKey = `${source_id}->${target_id}`;
+                            if (linkMap.has(linkKey)) {
+                                linkMap.get(linkKey).weight++;
+                            } else {
+                                linkMap.set(linkKey, {
+                                    source: source_id,
+                                    target: target_id,
+                                    weight: 1
+                                });
+                            }
+                            // console.log(`Added/updated link from IRQ: ${linkKey}`);
+
+                            // Decision: Should the IRQ context be cleared after use?
+                            // The problem: "如果相邻的下一行还是[irq]，则覆盖上一个相邻行的[irq]中记录的"
+                            // This implies IRQ context persists until overwritten by another IRQ on the same CPU.
+                            // So, we do not clear `last_irq_context_per_cpu[wakeup_cpu]` here.
+                        }
+                    }
+
+                    // Existing sched_switch / generic wakeup parsing logic
                     const match = line.match(currentRegex);
                     if (match) {
                         const current_line_prev_comm = match[line_prev_comm_idx];
